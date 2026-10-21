@@ -10,7 +10,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
@@ -58,6 +57,7 @@ import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.auth.AuthManager
+import com.example.ui.auth.AuthScreen
 import com.example.ui.dialogs.AddGameDialog
 import com.example.ui.dialogs.GameDetailSheet
 import com.example.ui.dialogs.ReviewDialog
@@ -66,13 +66,13 @@ import com.example.ui.screens.CommunityScreen
 import com.example.ui.screens.DiaryScreen
 import com.example.ui.screens.ExploreScreen
 import com.example.ui.screens.StatsScreen
-import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextPrimary
 import com.example.ui.viewmodel.GameViewModel
 import com.example.ui.viewmodel.NavigationTab
 import com.google.firebase.Firebase
@@ -109,10 +109,17 @@ fun RootAuthGate() {
         }
     }
 
-    AfterGameApp(
-        currentUser = currentUser,
-        onRequireAuth = { showAuthDialog = true }
-    )
+    if (currentUser == null) {
+        AuthScreen(
+            onAuthSuccess = {
+                currentUser = Firebase.auth.currentUser
+            }
+        )
+    } else {
+        AfterGameApp(
+            onRequireAuth = { showAuthDialog = true }
+        )
+    }
 
     if (showAuthDialog) {
         AuthRequiredDialog(
@@ -138,9 +145,104 @@ fun RootAuthGate() {
 }
 
 @Composable
+fun AuthRequiredDialog(
+    onDismiss: () -> Unit,
+    onSignIn: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            color = DarkBackground,
+            shape = RoundedCornerShape(22.dp),
+            tonalElevation = 10.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                CyberPrimary.copy(alpha = 0.7f)
+            ),
+            modifier = Modifier.padding(18.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 22.dp, vertical = 18.dp)
+            ) {
+                androidx.compose.foundation.layout.Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(58.dp)
+                            .border(
+                                1.dp,
+                                CyberPrimary.copy(alpha = 0.8f),
+                                RoundedCornerShape(18.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Groups,
+                            contentDescription = null,
+                            tint = CyberPrimary,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(12.dp))
+
+                    Text(
+                        text = "تسجيل الدخول مطلوب",
+                        color = TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
+
+                    Text(
+                        text = "لإكمال هذا التفاعل، سجل دخولك أولاً لمشاركة تقييمك، تعليقك، أو مراجعتك مع المجتمع.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center
+                    )
+
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(16.dp))
+
+                    Button(
+                        onClick = onSignIn,
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .height(52.dp)
+                    ) {
+                        Text(
+                            text = "تسجيل الدخول عبر Google",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
+
+                    TextButton(
+                        onClick = onDismiss
+                    ) {
+                        Text(
+                            text = "لاحقًا",
+                            color = CyberSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AfterGameApp(
     viewModel: GameViewModel = viewModel(),
-    currentUser: com.google.firebase.auth.FirebaseUser? = Firebase.auth.currentUser,
     onRequireAuth: () -> Unit = {}
 ) {
     val activeTab by viewModel.activeTab.collectAsStateWithLifecycle()
@@ -160,6 +262,8 @@ fun AfterGameApp(
     val isAddDialogOpen by viewModel.isAddGameDialogOpen.collectAsStateWithLifecycle()
     val selectedReviewForComments by viewModel.selectedReviewForComments.collectAsStateWithLifecycle()
     val activeComments by viewModel.activeComments.collectAsStateWithLifecycle()
+
+    val isSignedIn = Firebase.auth.currentUser != null
 
     BackHandler(
         enabled = selectedReviewForComments != null || selectedDetailGame != null ||
@@ -317,11 +421,11 @@ fun AfterGameApp(
                             selectedGenre = selectedGenre,
                             onGenreSelect = { viewModel.setSelectedGenre(it) },
                             onGameClick = { viewModel.openGameDetail(it) },
-                            onReviewClick = { game ->
-                                if (currentUser == null) onRequireAuth() else viewModel.openReviewDialog(game)
+                            onReviewClick = {
+                                if (isSignedIn) viewModel.openReviewDialog(it) else onRequireAuth()
                             },
                             onAddNewGameClick = {
-                                if (currentUser == null) onRequireAuth() else viewModel.setAddGameDialogOpen(true)
+                                if (isSignedIn) viewModel.setAddGameDialogOpen(true) else onRequireAuth()
                             },
                             isSearchingRawg = isSearchingRawg
                         )
@@ -330,10 +434,10 @@ fun AfterGameApp(
                         CommunityScreen(
                             reviews = communityReviews,
                             onLikeReview = { reviewId ->
-                                if (currentUser == null) onRequireAuth() else viewModel.likeReview(reviewId)
+                                if (isSignedIn) viewModel.likeReview(reviewId) else onRequireAuth()
                             },
                             onOpenComments = { review ->
-                                if (currentUser == null) onRequireAuth() else viewModel.openCommentsForReview(review)
+                                if (isSignedIn) viewModel.openCommentsForReview(review) else onRequireAuth()
                             }
                         )
                     }
@@ -347,14 +451,14 @@ fun AfterGameApp(
                             sortOption = sortOption,
                             onSortOptionChange = { viewModel.setSortOption(it) },
                             onGameClick = { viewModel.openGameDetail(it) },
-                            onReviewClick = { game ->
-                                if (currentUser == null) onRequireAuth() else viewModel.openReviewDialog(game)
+                            onReviewClick = {
+                                if (isSignedIn) viewModel.openReviewDialog(it) else onRequireAuth()
                             },
-                            onToggleFavorite = { game ->
-                                if (currentUser == null) onRequireAuth() else viewModel.toggleFavorite(game)
+                            onToggleFavorite = {
+                                if (isSignedIn) viewModel.toggleFavorite(it) else onRequireAuth()
                             },
-                            onDeleteGame = { game ->
-                                if (currentUser == null) onRequireAuth() else viewModel.deleteGame(game)
+                            onDeleteGame = {
+                                if (isSignedIn) viewModel.deleteGame(it) else onRequireAuth()
                             },
                             onExploreClick = { viewModel.setActiveTab(NavigationTab.EXPLORE) }
                         )
@@ -363,7 +467,9 @@ fun AfterGameApp(
                         StatsScreen(
                             stats = stats,
                             onGameClick = { viewModel.openGameDetail(it) },
-                            onResetDefaults = { viewModel.resetToDefaults() }
+                            onResetDefaults = {
+                                if (isSignedIn) viewModel.resetToDefaults() else onRequireAuth()
+                            }
                         )
                     }
                 }
@@ -376,13 +482,13 @@ fun AfterGameApp(
             game = game,
             onDismiss = { viewModel.closeGameDetail() },
             onOpenReview = {
-                if (currentUser == null) onRequireAuth() else viewModel.openReviewDialog(game)
+                if (isSignedIn) viewModel.openReviewDialog(game) else onRequireAuth()
             },
-            onToggleFavorite = { gameToToggle ->
-                if (currentUser == null) onRequireAuth() else viewModel.toggleFavorite(gameToToggle)
+            onToggleFavorite = {
+                if (isSignedIn) viewModel.toggleFavorite(game) else onRequireAuth()
             },
-            onDeleteGame = { gameToDelete ->
-                if (currentUser == null) onRequireAuth() else viewModel.deleteGame(gameToDelete)
+            onDeleteGame = {
+                if (isSignedIn) viewModel.deleteGame(game) else onRequireAuth()
             }
         )
     }
@@ -392,27 +498,26 @@ fun AfterGameApp(
             game = game,
             onDismiss = { viewModel.closeReviewDialog() },
             onSave = { rating, status, hours, reviewTitle, reviewText, pros, cons, gameplay, story, visuals, audio, platformPlayed, isFav ->
-                if (currentUser == null) {
+                if (isSignedIn) {
+                    viewModel.saveReview(
+                        gameId = game.id,
+                        userRating = rating,
+                        status = status,
+                        hoursPlayed = hours,
+                        reviewTitle = reviewTitle,
+                        userReview = reviewText,
+                        pros = pros,
+                        cons = cons,
+                        subGameplayScore = gameplay,
+                        subStoryScore = story,
+                        subVisualsScore = visuals,
+                        subAudioScore = audio,
+                        platformPlayed = platformPlayed,
+                        isFavorite = isFav
+                    )
+                } else {
                     onRequireAuth()
-                    viewModel.closeReviewDialog()
-                    return@ReviewDialog
                 }
-                viewModel.saveReview(
-                    gameId = game.id,
-                    userRating = rating,
-                    status = status,
-                    hoursPlayed = hours,
-                    reviewTitle = reviewTitle,
-                    userReview = reviewText,
-                    pros = pros,
-                    cons = cons,
-                    subGameplayScore = gameplay,
-                    subStoryScore = story,
-                    subVisualsScore = visuals,
-                    subAudioScore = audio,
-                    platformPlayed = platformPlayed,
-                    isFavorite = isFav
-                )
             }
         )
     }
@@ -421,25 +526,24 @@ fun AfterGameApp(
         AddGameDialog(
             onDismiss = { viewModel.setAddGameDialogOpen(false) },
             onAdd = { title, titleAr, developer, releaseYear, genres, platforms, synopsis, rating, status, hours, reviewText, platformPlayed ->
-                if (currentUser == null) {
+                if (isSignedIn) {
+                    viewModel.addCustomGame(
+                        title = title,
+                        titleAr = titleAr,
+                        developer = developer,
+                        releaseYear = releaseYear,
+                        genres = genres,
+                        platforms = platforms,
+                        synopsis = synopsis,
+                        userRating = rating,
+                        status = status,
+                        hoursPlayed = hours,
+                        userReview = reviewText,
+                        platformPlayed = platformPlayed
+                    )
+                } else {
                     onRequireAuth()
-                    viewModel.setAddGameDialogOpen(false)
-                    return@AddGameDialog
                 }
-                viewModel.addCustomGame(
-                    title = title,
-                    titleAr = titleAr,
-                    developer = developer,
-                    releaseYear = releaseYear,
-                    genres = genres,
-                    platforms = platforms,
-                    synopsis = synopsis,
-                    userRating = rating,
-                    status = status,
-                    hoursPlayed = hours,
-                    userReview = reviewText,
-                    platformPlayed = platformPlayed
-                )
             }
         )
     }
@@ -450,94 +554,12 @@ fun AfterGameApp(
             comments = activeComments,
             onDismiss = { viewModel.closeComments() },
             onAddComment = { text ->
-                if (currentUser == null) {
+                if (isSignedIn) {
+                    viewModel.addComment(review.id, text)
+                } else {
                     onRequireAuth()
-                    viewModel.closeComments()
-                    return@CommentsBottomSheet
                 }
-                viewModel.addComment(review.id, text)
             }
         )
-    }
-}
-
-@Composable
-fun AuthRequiredDialog(
-    onDismiss: () -> Unit,
-    onSignIn: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            color = DarkBackground,
-            shape = RoundedCornerShape(20.dp),
-            tonalElevation = 8.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.5f)),
-            modifier = Modifier
-                .padding(16.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .border(1.dp, CyberPrimary.copy(alpha = 0.8f), RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Groups,
-                        contentDescription = null,
-                        tint = CyberPrimary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Text(
-                    text = "تسجيل الدخول مطلوب",
-                    color = com.example.ui.theme.TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-
-                Text(
-                    text = "لإكمال هذا التفاعل، سجل دخولك أولاً لمشاركة تقييمك أو التعليق مع المجتمع.",
-                    color = com.example.ui.theme.TextMuted,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                Button(
-                    onClick = onSignIn,
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 18.dp)
-                        .sizeIn(minHeight = 48.dp)
-                ) {
-                    Text(
-                        text = "تسجيل الدخول عبر Google",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.padding(top = 6.dp)
-                ) {
-                    Text(
-                        text = "لاحقًا",
-                        color = CyberSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
     }
 }
