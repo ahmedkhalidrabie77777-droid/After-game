@@ -105,18 +105,26 @@ fun ExploreScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkSurface),
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        DarkSurface,
+                        DarkSurface,
+                        DarkSurfaceVariant.copy(alpha = 0.88f)
+                    )
+                )
+            ),
         contentPadding = PaddingValues(bottom = 90.dp)
     ) {
-        // Hero Banner Item
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .border(1.dp, CyberPrimary.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .border(1.dp, CyberPrimary.copy(alpha = 0.35f), RoundedCornerShape(22.dp))
+                    .background(DarkSurfaceVariant)
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.img_hero_banner),
@@ -131,9 +139,9 @@ fun ExploreScreen(
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    Color.Black.copy(alpha = 0.2f),
-                                    Color.Black.copy(alpha = 0.7f),
-                                    DarkSurface.copy(alpha = 0.95f)
+                                    Color.Black.copy(alpha = 0.18f),
+                                    Color.Black.copy(alpha = 0.6f),
+                                    DarkSurface.copy(alpha = 0.96f)
                                 )
                             )
                         )
@@ -142,7 +150,7 @@ fun ExploreScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Row(
@@ -154,14 +162,22 @@ fun ExploreScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.weight(1f, fill = false)
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_after_game_logo),
-                                contentDescription = "After Game Logo",
+                            Box(
                                 modifier = Modifier
                                     .size(46.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(1.5.dp, CyberPrimary, RoundedCornerShape(12.dp))
-                            )
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(DarkSurfaceVariant.copy(alpha = 0.8f))
+                                    .border(1.5.dp, CyberPrimary, RoundedCornerShape(14.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_after_game_logo),
+                                    contentDescription = "After Game Logo",
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                )
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
@@ -194,7 +210,12 @@ fun ExploreScreen(
                                 tint = Color.White
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "إضافة لعبة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(
+                                text = "إضافة لعبة",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
                     }
                 }
@@ -226,21 +247,22 @@ fun ExploreScreen(
                         }
                     },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = DarkSurfaceVariant,
-                        unfocusedContainerColor = DarkSurfaceVariant,
+                        focusedContainerColor = DarkSurfaceVariant.copy(alpha = 0.9f),
+                        unfocusedContainerColor = DarkSurfaceVariant.copy(alpha = 0.9f),
                         focusedBorderColor = CyberPrimary,
                         unfocusedBorderColor = BorderSubtle,
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary
                     ),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(56.dp)
                         .testTag("explore_search_bar")
                 )
 
                 if (isSearchingRawg) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(horizontal = 4.dp)
@@ -264,7 +286,7 @@ fun ExploreScreen(
         item {
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(genresList) { (genreKey, genreLabel) ->
@@ -274,7 +296,7 @@ fun ExploreScreen(
                         onClick = { onGenreSelect(genreKey) },
                         label = { Text(genreLabel, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CyberPrimary,
+                            selectedContainerColor = CyberPrimary.copy(alpha = 0.9f),
                             selectedLabelColor = Color.White,
                             containerColor = DarkSurfaceVariant,
                             labelColor = TextSecondary
@@ -291,7 +313,7 @@ fun ExploreScreen(
 
         if (searchQuery.isBlank() && selectedGenre == "All" && featuredGames.isNotEmpty()) {
             item {
-                Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
                     Text(
                         text = "أبرز الألعاب المرشحة للمراجعة",
                         color = TextPrimary,
@@ -363,31 +385,48 @@ fun FeaturedGameCard(
         label = "featuredCardScale"
     )
     val cardColor by animateColorAsState(
-        targetValue = if (isPressed) CyberPrimary.copy(alpha = 0.18f) else DarkSurfaceVariant,
+        targetValue = if (isPressed) DarkSurfaceVariant.copy(alpha = 0.96f) else DarkSurfaceVariant,
         label = "featuredCardColor"
     )
 
     Card(
         colors = CardDefaults.cardColors(containerColor = cardColor),
-        shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = if (isPressed) 0.9f else 0.35f)),
+        shape = RoundedCornerShape(20.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isPressed) CyberPrimary.copy(alpha = 0.85f) else CyberPrimary.copy(alpha = 0.35f)
+        ),
         modifier = modifier
-            .width(180.dp)
+            .width(186.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                shadowElevation = if (isPressed) 18f else 10f
+                shadowElevation = if (isPressed) 20f else 12f
                 translationY = if (isPressed) 1f else 0f
             }
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .testTag("featured_game_${game.id}")
     ) {
         Column {
-            GamePosterThumbnail(
-                game = game,
-                height = 120.dp,
-                width = 180.dp
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                CyberPrimary.copy(alpha = 0.08f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            ) {
+                GamePosterThumbnail(
+                    game = game,
+                    height = 120.dp,
+                    width = 186.dp
+                )
+            }
+
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
                     text = game.title,
@@ -402,10 +441,11 @@ fun FeaturedGameCard(
                         text = game.titleAr,
                         color = CyberSecondary,
                         fontSize = 11.sp,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -431,7 +471,7 @@ fun FeaturedGameCard(
                         onClick = onReviewClick,
                         modifier = Modifier
                             .size(28.dp)
-                            .background(CyberPrimary.copy(alpha = 0.2f), CircleShape)
+                            .background(CyberPrimary.copy(alpha = 0.18f), CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.RateReview,
@@ -456,18 +496,18 @@ fun ExploreGameRowCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.98f else 1f,
+        targetValue = if (isPressed) 0.985f else 1f,
         animationSpec = spring(dampingRatio = 0.8f, stiffness = 280f),
         label = "rowCardScale"
     )
     val accentColor by animateColorAsState(
-        targetValue = if (isPressed) CyberPrimary.copy(alpha = 0.12f) else DarkSurfaceVariant,
+        targetValue = if (isPressed) CyberPrimary.copy(alpha = 0.09f) else DarkSurfaceVariant,
         label = "rowCardAccent"
     )
 
     Card(
         colors = CardDefaults.cardColors(containerColor = accentColor),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, if (isPressed) CyberPrimary.copy(alpha = 0.65f) else BorderSubtle),
         modifier = modifier
             .fillMaxWidth()
@@ -476,19 +516,19 @@ fun ExploreGameRowCard(
                 scaleX = scale
                 scaleY = scale
                 translationY = if (isPressed) 1f else 0f
-                shadowElevation = if (isPressed) 12f else 6f
+                shadowElevation = if (isPressed) 14f else 8f
             }
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .testTag("explore_game_card_${game.id}")
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             GamePosterThumbnail(
                 game = game,
-                height = 85.dp,
-                width = 65.dp
+                height = 88.dp,
+                width = 66.dp
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -502,7 +542,7 @@ fun ExploreGameRowCard(
                     Text(
                         text = game.title,
                         color = TextPrimary,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -519,7 +559,8 @@ fun ExploreGameRowCard(
                         text = game.titleAr,
                         color = CyberSecondary,
                         fontSize = 11.sp,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -537,7 +578,7 @@ fun ExploreGameRowCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -569,12 +610,12 @@ fun ExploreGameRowCard(
                     Button(
                         onClick = onReviewClick,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (game.isLogged) DarkSurfaceElevated else CyberPrimary.copy(alpha = 0.2f),
+                            containerColor = if (game.isLogged) DarkSurfaceElevated else CyberPrimary.copy(alpha = 0.16f),
                             contentColor = if (game.isLogged) TextSecondary else CyberPrimary
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 3.dp),
+                        modifier = Modifier.height(30.dp)
                     ) {
                         Text(
                             text = if (game.isLogged) "عدل تقييمك" else "قيم اللعبة",
