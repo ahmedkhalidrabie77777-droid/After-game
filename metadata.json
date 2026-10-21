@@ -1,0 +1,6 @@
+{
+  "name": "After Game",
+  "description": "Video game tracking, rating, and review diary app. Log played games, score experiences, track playtime, and review backlog.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
