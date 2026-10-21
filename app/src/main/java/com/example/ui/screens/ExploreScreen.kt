@@ -78,6 +78,7 @@ fun ExploreScreen(
     onGameClick: (GameItem) -> Unit,
     onReviewClick: (GameItem) -> Unit,
     onAddNewGameClick: () -> Unit,
+    isSearchingRawg: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val genresList = listOf(
@@ -139,20 +140,34 @@ fun ExploreScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "AFTER GAME",
-                                color = Color.White,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 2.sp
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_after_game_logo),
+                                contentDescription = "After Game Logo",
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(1.5.dp, CyberPrimary, RoundedCornerShape(12.dp))
                             )
-                            Text(
-                                text = "سجل ومراجعات ألعاب الفيديو الخاصة بك",
-                                color = CyberSecondary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "AFTER GAME",
+                                    color = Color.White,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 1.8.sp
+                                )
+                                Text(
+                                    text = "سجل ومراجعات ألعاب الفيديو",
+                                    color = CyberSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
 
                         Button(
@@ -214,6 +229,26 @@ fun ExploreScreen(
                         .fillMaxWidth()
                         .testTag("explore_search_bar")
                 )
+
+                if (isSearchingRawg) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = CyberSecondary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "جاري البحث في قاعدة بيانات RAWG العالمية...",
+                            color = CyberSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
             }
         }
 

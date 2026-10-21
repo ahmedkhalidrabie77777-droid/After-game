@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public profile and gaming identity for authenticated users.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "username": { "type": "string", "description": "Gamer tag handle" },
+        "displayName": { "type": "string", "description": "Display name" },
+        "photoUrl": { "type": "string", "description": "Avatar image URL" },
+        "bio": { "type": "string", "description": "Short gamer bio" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last updated timestamp" }
+      },
+      "required": ["userId", "username", "createdAt"]
+    },
+    "GameReview": {
+      "title": "GameReview",
+      "description": "Public community video game review and rating visible to all gamers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Review document identifier" },
+        "userId": { "type": "string", "description": "Author user UID" },
+        "authorName": { "type": "string", "description": "Author gamer name" },
+        "authorPhotoUrl": { "type": "string", "description": "Author avatar image URL" },
+        "gameId": { "type": "string", "description": "Target video game ID" },
+        "gameTitle": { "type": "string", "description": "Game title" },
+        "gameTitleAr": { "type": "string", "description": "Game title in Arabic" },
+        "rating": { "type": "number", "description": "Rating score out of 5 stars" },
+        "status": { "type": "string", "enum": ["PLAYING", "COMPLETED", "BACKLOG", "MASTERED", "DROPPED"], "description": "Play status" },
+        "hoursPlayed": { "type": "number", "description": "Total hours played" },
+        "reviewTitle": { "type": "string", "description": "Summary headline" },
+        "reviewBody": { "type": "string", "description": "Detailed review body" },
+        "platformPlayed": { "type": "string", "description": "Platform played on" },
+        "pros": { "type": "string", "description": "Pros highlights" },
+        "cons": { "type": "string", "description": "Cons highlights" },
+        "subGameplayScore": { "type": "number", "description": "Gameplay score out of 10" },
+        "subStoryScore": { "type": "number", "description": "Story score out of 10" },
+        "subVisualsScore": { "type": "number", "description": "Visuals score out of 10" },
+        "subAudioScore": { "type": "number", "description": "Audio score out of 10" },
+        "likesCount": { "type": "number", "description": "Number of upvotes/likes" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last updated timestamp" }
+      },
+      "required": ["userId", "gameId", "gameTitle", "rating", "status", "createdAt"]
+    },
+    "ReviewComment": {
+      "title": "ReviewComment",
+      "description": "Comment left on a public game review by another gamer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Author UID" },
+        "authorName": { "type": "string", "description": "Author name" },
+        "commentText": { "type": "string", "description": "Comment message" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp" }
+      },
+      "required": ["userId", "authorName", "commentText", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile directory"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "GameReview",
+      "description": "Public global community game reviews collection"
+    },
+    "/reviews/{reviewId}/comments/{commentId}": {
+      "schema": "ReviewComment",
+      "description": "Comments thread under a review"
+    }
+  }
+}

@@ -1,21 +1,32 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.firebase.FirebaseComment
+import com.example.data.firebase.FirebaseReview
+import com.example.data.firebase.FirestoreReviewRepository
 import com.example.data.local.AppDatabase
 import com.example.data.model.GameItem
+import com.example.data.remote.RawgApiClient
 import com.example.data.repository.GameRepository
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class NavigationTab {
     EXPLORE,
+    COMMUNITY,
     DIARY,
     STATS
 }
@@ -41,17 +52,32 @@ data class GamerStats(
 )
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: GameRepository
+    private val localRepository: GameRepository
+    private val firestoreRepository: FirestoreReviewRepository
 
     init {
         val database = AppDatabase.getDatabase(application, viewModelScope)
-        repository = GameRepository(database.gameDao())
+        localRepository = GameRepository(database.gameDao())
+        firestoreRepository = FirestoreReviewRepository(application)
+
         viewModelScope.launch {
-            repository.seedIfEmpty()
+            localRepository.seedIfEmpty()
         }
     }
 
-    val rawGames: StateFlow<List<GameItem>> = repository.allGames
+    val rawGames: StateFlow<List<GameItem>> = localRepository.allGames
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // Real-time Community Reviews from Firestore
+    val communityReviews: StateFlow<List<FirebaseReview>> = firestoreRepository.observeAllCommunityReviews()
+        .catch { err ->
+            Log.e("GameViewModel", "Error observing community reviews", err)
+            emit(emptyList())
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -85,13 +111,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAddGameDialogOpen = MutableStateFlow(false)
     val isAddGameDialogOpen: StateFlow<Boolean> = _isAddGameDialogOpen.asStateFlow()
 
-    // Filtered games for Explore Tab
+    // RAWG Live API Search Results
+    private val _rawgApiGames = MutableStateFlow<List<GameItem>>(emptyList())
+    val rawgApiGames: StateFlow<List<GameItem>> = _rawgApiGames.asStateFlow()
+
+    private val _isSearchingRawg = MutableStateFlow(false)
+    val isSearchingRawg: StateFlow<Boolean> = _isSearchingRawg.asStateFlow()
+
+    // Active review for viewing comments thread
+    private val _selectedReviewForComments = MutableStateFlow<FirebaseReview?>(null)
+    val selectedReviewForComments: StateFlow<FirebaseReview?> = _selectedReviewForComments.asStateFlow()
+
+    private val _activeComments = MutableStateFlow<List<FirebaseComment>>(emptyList())
+    val activeComments: StateFlow<List<FirebaseComment>> = _activeComments.asStateFlow()
+
+    // Combined explore list (Local DB + Live RAWG API results)
     val exploreGames: StateFlow<List<GameItem>> = combine(
         rawGames,
+        _rawgApiGames,
         _searchQuery,
         _selectedGenre
-    ) { games, query, genre ->
-        games.filter { game ->
+    ) { localGames, apiGames, query, genre ->
+        val source = if (apiGames.isNotEmpty() && query.isNotBlank()) {
+            apiGames
+        } else {
+            localGames
+        }
+
+        source.filter { game ->
             val matchesQuery = query.isBlank() ||
                 game.title.contains(query, ignoreCase = true) ||
                 game.titleAr.contains(query, ignoreCase = true) ||
@@ -103,7 +150,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Filtered & Sorted games for Diary Tab
+    // Diary games
     val diaryGames: StateFlow<List<GameItem>> = combine(
         rawGames,
         _diaryStatusFilter,
@@ -133,7 +180,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Statistics
+    // Gamer stats
     val stats: StateFlow<GamerStats> = rawGames.combine(_activeTab) { games, _ ->
         val logged = games.filter { it.isLogged }
         val completed = logged.filter { it.status == "COMPLETED" || it.status == "MASTERED" }.size
@@ -146,7 +193,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         val topRated = rated.sortedByDescending { it.userRating }.take(5)
 
-        // Count genres
         val genreMap = mutableMapOf<String, Int>()
         logged.forEach { game ->
             game.genres.split(",").forEach { rawG ->
@@ -158,7 +204,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         val favoriteGenres = genreMap.toList().sortedByDescending { it.second }.take(4)
 
-        // Count platforms
         val platformMap = mutableMapOf<String, Int>()
         logged.forEach { game ->
             val p = if (game.platformPlayed.isNotBlank()) game.platformPlayed else "PC"
@@ -185,6 +230,45 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
+        if (query.length >= 3) {
+            searchRawgLive(query)
+        } else if (query.isBlank()) {
+            _rawgApiGames.value = emptyList()
+        }
+    }
+
+    private fun searchRawgLive(query: String) {
+        viewModelScope.launch {
+            _isSearchingRawg.value = true
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RawgApiClient.service.getGames(
+                        apiKey = RawgApiClient.apiKey,
+                        search = query,
+                        pageSize = 15
+                    )
+                }
+                val converted = response.results.map { dto ->
+                    GameItem(
+                        id = dto.id,
+                        title = dto.name,
+                        titleAr = "",
+                        developer = "RAWG Database",
+                        releaseYear = dto.released?.take(4)?.toIntOrNull() ?: 2024,
+                        platforms = dto.platforms.mapNotNull { it.platform?.name }.take(4).joinToString(", ").ifBlank { "PC, Console" },
+                        genres = dto.genres.map { it.name }.take(3).joinToString(", ").ifBlank { "Action" },
+                        coverUrl = dto.backgroundImage ?: "",
+                        communityRating = (dto.rating).coerceIn(0f, 5f),
+                        synopsis = "بيانات مباشرة من RAWG Video Games Database لـ ${dto.name} مع ${dto.ratingsCount} تقييم عالمي."
+                    )
+                }
+                _rawgApiGames.value = converted
+            } catch (e: Exception) {
+                Log.w("GameViewModel", "RAWG search fallback to local", e)
+            } finally {
+                _isSearchingRawg.value = false
+            }
+        }
     }
 
     fun setSelectedGenre(genre: String) {
@@ -223,6 +307,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _isAddGameDialogOpen.value = isOpen
     }
 
+    fun openCommentsForReview(review: FirebaseReview) {
+        _selectedReviewForComments.value = review
+        viewModelScope.launch {
+            firestoreRepository.observeComments(review.id).collect { comments ->
+                _activeComments.value = comments
+            }
+        }
+    }
+
+    fun closeComments() {
+        _selectedReviewForComments.value = null
+        _activeComments.value = emptyList()
+    }
+
+    fun likeReview(reviewId: String) {
+        viewModelScope.launch {
+            try {
+                firestoreRepository.likeReview(reviewId)
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Error liking review", e)
+            }
+        }
+    }
+
+    fun addComment(reviewId: String, text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            try {
+                firestoreRepository.addComment(reviewId, text)
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Error adding comment", e)
+            }
+        }
+    }
+
     fun saveReview(
         gameId: Long,
         userRating: Float,
@@ -240,7 +359,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         isFavorite: Boolean
     ) {
         viewModelScope.launch {
-            val existing = rawGames.value.find { it.id == gameId } ?: return@launch
+            // Find game from local or API results
+            val existing = rawGames.value.find { it.id == gameId }
+                ?: _rawgApiGames.value.find { it.id == gameId }
+                ?: return@launch
+
             val updated = existing.copy(
                 userRating = userRating,
                 status = status,
@@ -257,11 +380,37 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 isFavorite = isFavorite,
                 loggedDate = if (existing.loggedDate > 0L) existing.loggedDate else System.currentTimeMillis()
             )
-            repository.updateGame(updated)
-            // also update selected detail if open
+
+            // 1. Save to local SQLite Room
+            localRepository.insertGame(updated)
             if (_selectedGameForDetail.value?.id == gameId) {
                 _selectedGameForDetail.value = updated
             }
+
+            // 2. Publish to Cloud Firebase Firestore so ALL users see it in real-time!
+            try {
+                val cloudReview = FirebaseReview(
+                    gameId = "game_${existing.id}",
+                    gameTitle = existing.title,
+                    gameTitleAr = existing.titleAr,
+                    rating = userRating.toDouble(),
+                    status = status,
+                    hoursPlayed = hoursPlayed.toDouble(),
+                    reviewTitle = reviewTitle.trim(),
+                    reviewBody = userReview.trim(),
+                    platformPlayed = platformPlayed,
+                    pros = pros.trim(),
+                    cons = cons.trim(),
+                    subGameplayScore = subGameplayScore.toDouble(),
+                    subStoryScore = subStoryScore.toDouble(),
+                    subVisualsScore = subVisualsScore.toDouble(),
+                    subAudioScore = subAudioScore.toDouble()
+                )
+                firestoreRepository.publishReview(cloudReview)
+            } catch (e: Exception) {
+                Log.w("GameViewModel", "Cloud sync skipped: ${e.message}")
+            }
+
             closeReviewDialog()
         }
     }
@@ -269,20 +418,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleFavorite(game: GameItem) {
         viewModelScope.launch {
             val updated = game.copy(isFavorite = !game.isFavorite)
-            repository.updateGame(updated)
-            if (_selectedGameForDetail.value?.id == game.id) {
-                _selectedGameForDetail.value = updated
-            }
-        }
-    }
-
-    fun quickChangeStatus(game: GameItem, newStatus: String) {
-        viewModelScope.launch {
-            val updated = game.copy(
-                status = newStatus,
-                loggedDate = if (game.loggedDate > 0L) game.loggedDate else System.currentTimeMillis()
-            )
-            repository.updateGame(updated)
+            localRepository.updateGame(updated)
             if (_selectedGameForDetail.value?.id == game.id) {
                 _selectedGameForDetail.value = updated
             }
@@ -304,14 +440,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         platformPlayed: String
     ) {
         viewModelScope.launch {
-            val gradients = listOf(
-                "#8B5CF6,#06B6D4",
-                "#EC4899,#8B5CF6",
-                "#3B82F6,#10B981",
-                "#F59E0B,#EF4444",
-                "#6366F1,#A855F7"
-            )
-            val randomGradient = gradients.random()
             val newGame = GameItem(
                 title = title.trim(),
                 titleAr = titleAr.trim(),
@@ -319,8 +447,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 releaseYear = if (releaseYear in 1970..2030) releaseYear else 2024,
                 genres = genres.trim().ifBlank { "Action" },
                 platforms = platforms.trim().ifBlank { "PC, Console" },
-                gradientColors = randomGradient,
-                synopsis = synopsis.trim().ifBlank { "لعبة جديدة تمت إضافتها إلى المكتبة الخاصة بك." },
+                synopsis = synopsis.trim().ifBlank { "لعبة مخصصة مسجلة في المكتبة." },
                 communityRating = 4.5f,
                 userRating = userRating,
                 status = status,
@@ -329,14 +456,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 platformPlayed = platformPlayed,
                 loggedDate = if (userRating > 0f || status != "NONE") System.currentTimeMillis() else 0L
             )
-            repository.insertGame(newGame)
+            val generatedId = localRepository.insertGame(newGame)
+
+            // Also publish to community Firestore if reviewed
+            if (userRating > 0f || userReview.isNotBlank()) {
+                try {
+                    val cloudReview = FirebaseReview(
+                        gameId = "game_$generatedId",
+                        gameTitle = newGame.title,
+                        gameTitleAr = newGame.titleAr,
+                        rating = userRating.toDouble(),
+                        status = status,
+                        hoursPlayed = hoursPlayed.toDouble(),
+                        reviewBody = userReview.trim(),
+                        platformPlayed = platformPlayed
+                    )
+                    firestoreRepository.publishReview(cloudReview)
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "Cloud publish skipped: ${e.message}")
+                }
+            }
+
             _isAddGameDialogOpen.value = false
         }
     }
 
     fun deleteGame(game: GameItem) {
         viewModelScope.launch {
-            repository.deleteGame(game)
+            localRepository.deleteGame(game)
             if (_selectedGameForDetail.value?.id == game.id) {
                 _selectedGameForDetail.value = null
             }
@@ -348,7 +495,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetToDefaults() {
         viewModelScope.launch {
-            repository.resetToDefaults()
+            localRepository.resetToDefaults()
         }
     }
 }

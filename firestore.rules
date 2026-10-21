@@ -1,0 +1,143 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.username is string && data.username.size() >= 2 && data.username.size() <= 50 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() <= 500));
+    }
+
+    function isValidGameReview(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.gameId is string && data.gameId.size() <= 128 &&
+             data.gameTitle is string && data.gameTitle.size() <= 200 &&
+             (!('gameTitleAr' in data) || (data.gameTitleAr is string && data.gameTitleAr.size() <= 200)) &&
+             (!('authorName' in data) || (data.authorName is string && data.authorName.size() <= 100)) &&
+             (!('authorPhotoUrl' in data) || (data.authorPhotoUrl is string && data.authorPhotoUrl.size() <= 500)) &&
+             data.rating is number && data.rating >= 0 && data.rating <= 5 &&
+             data.status in ['PLAYING', 'COMPLETED', 'BACKLOG', 'MASTERED', 'DROPPED'] &&
+             (!('hoursPlayed' in data) || (data.hoursPlayed is number && data.hoursPlayed >= 0)) &&
+             (!('reviewTitle' in data) || (data.reviewTitle is string && data.reviewTitle.size() <= 200)) &&
+             (!('reviewBody' in data) || (data.reviewBody is string && data.reviewBody.size() <= 5000)) &&
+             (!('platformPlayed' in data) || (data.platformPlayed is string && data.platformPlayed.size() <= 100)) &&
+             (!('pros' in data) || (data.pros is string && data.pros.size() <= 500)) &&
+             (!('cons' in data) || (data.cons is string && data.cons.size() <= 500)) &&
+             (!('subGameplayScore' in data) || (data.subGameplayScore is number && data.subGameplayScore >= 0 && data.subGameplayScore <= 10)) &&
+             (!('subStoryScore' in data) || (data.subStoryScore is number && data.subStoryScore >= 0 && data.subStoryScore <= 10)) &&
+             (!('subVisualsScore' in data) || (data.subVisualsScore is number && data.subVisualsScore >= 0 && data.subVisualsScore <= 10)) &&
+             (!('subAudioScore' in data) || (data.subAudioScore is number && data.subAudioScore >= 0 && data.subAudioScore <= 10)) &&
+             (!('likesCount' in data) || (data.likesCount is number && data.likesCount >= 0));
+    }
+
+    function isValidReviewComment(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.authorName is string && data.authorName.size() <= 100 &&
+             data.commentText is string && data.commentText.size() >= 1 && data.commentText.size() <= 1000;
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'username', 'createdAt']) &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       isValidUserProfile(incoming());
+      allow update: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['username', 'displayName', 'photoUrl', 'bio', 'updatedAt']);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Community Public Game Reviews
+    match /reviews/{reviewId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'gameId', 'gameTitle', 'rating', 'status', 'createdAt']) &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       isValidGameReview(incoming());
+
+      allow update: if isSignedIn() && isValidId(reviewId) && (
+        // Author edit action
+        (
+          existing().userId == request.auth.uid &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+          isValidGameReview(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'rating', 'status', 'hoursPlayed', 'reviewTitle', 'reviewBody',
+            'platformPlayed', 'pros', 'cons', 'subGameplayScore', 'subStoryScore',
+            'subVisualsScore', 'subAudioScore', 'updatedAt'
+          ])
+        ) ||
+        // Upvote/like action by community
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['likesCount']) &&
+          incoming().likesCount is number
+        )
+      );
+
+      allow delete: if isSignedIn() && isValidId(reviewId) && existing().userId == request.auth.uid;
+
+      // Comments Thread on Reviews
+      match /comments/{commentId} {
+        allow get, list: if isSignedIn() && isValidId(reviewId);
+        allow create: if isSignedIn() &&
+                         isValidId(reviewId) &&
+                         isValidId(commentId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'authorName', 'commentText', 'createdAt']) &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidReviewComment(incoming());
+        allow update: if isSignedIn() &&
+                         isValidId(reviewId) &&
+                         isValidId(commentId) &&
+                         existing().userId == request.auth.uid &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidReviewComment(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['commentText']);
+        allow delete: if isSignedIn() &&
+                         isValidId(reviewId) &&
+                         isValidId(commentId) &&
+                         (existing().userId == request.auth.uid || get(/databases/$(database)/documents/reviews/$(reviewId)).data.userId == request.auth.uid);
+      }
+    }
+  }
+}
