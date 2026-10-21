@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +68,7 @@ import com.example.ui.components.StarRatingDisplay
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
+import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.DarkSurfaceVariant
@@ -113,13 +115,20 @@ fun DiaryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkSurface)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        DarkBackground,
+                        DarkSurface,
+                        DarkSurfaceVariant.copy(alpha = 0.96f)
+                    )
+                )
+            )
     ) {
-        // Top Header
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -140,11 +149,10 @@ fun DiaryScreen(
                     )
                 }
 
-                // Sort Button & Menu
                 Box {
                     Surface(
-                        color = DarkSurfaceVariant,
-                        shape = RoundedCornerShape(10.dp),
+                        color = DarkSurfaceVariant.copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(12.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                         modifier = Modifier.clickable { sortMenuExpanded = true }
                     ) {
@@ -194,11 +202,10 @@ fun DiaryScreen(
             }
         }
 
-        // Status Tabs (Letterboxd style)
         val selectedTabIndex = tabs.indexOfFirst { it.first == statusFilter }.coerceAtLeast(0)
         ScrollableTabRow(
             selectedTabIndex = selectedTabIndex,
-            containerColor = DarkSurface,
+            containerColor = DarkSurface.copy(alpha = 0.4f),
             contentColor = CyberPrimary,
             edgePadding = 16.dp,
             indicator = { tabPositions ->
@@ -233,7 +240,6 @@ fun DiaryScreen(
             }
         }
 
-        // Platform Filter Row
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -259,7 +265,6 @@ fun DiaryScreen(
             }
         }
 
-        // Content: List of Diary items or Empty State
         if (games.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -274,7 +279,8 @@ fun DiaryScreen(
                     Box(
                         modifier = Modifier
                             .size(72.dp)
-                            .background(DarkSurfaceVariant, CircleShape),
+                            .background(CyberPrimary.copy(alpha = 0.12f), CircleShape)
+                            .border(1.dp, CyberPrimary.copy(alpha = 0.5f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -337,7 +343,7 @@ fun DiaryGameCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.96f)),
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
         modifier = modifier
@@ -420,7 +426,6 @@ fun DiaryGameCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Stars rating
                     StarRatingDisplay(
                         rating = game.userRating,
                         starSize = 16.dp
@@ -428,7 +433,6 @@ fun DiaryGameCard(
                 }
             }
 
-            // User's Review Quote or Headline if available
             if (game.reviewTitle.isNotBlank() || game.userReview.isNotBlank()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
@@ -460,7 +464,6 @@ fun DiaryGameCard(
                 }
             }
 
-            // Bottom Actions (Edit review & Delete)
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
