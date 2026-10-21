@@ -31,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -96,11 +95,10 @@ fun GameDetailSheet(
                 .fillMaxHeight(0.92f)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Backdrop Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(210.dp)
                     .background(Brush.verticalGradient(gradientColors))
             ) {
                 if (game.coverUrl.isNotBlank()) {
@@ -112,22 +110,20 @@ fun GameDetailSheet(
                     )
                 }
 
-                // Overlay gradient
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    Color.Black.copy(alpha = 0.4f),
-                                    DarkSurface.copy(alpha = 0.8f),
+                                    Color.Black.copy(alpha = 0.25f),
+                                    DarkSurface.copy(alpha = 0.75f),
                                     DarkSurface
                                 )
                             )
                         )
                 )
 
-                // Top Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,17 +176,16 @@ fun GameDetailSheet(
                     }
                 }
 
-                // Title overlay at bottom of header
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
                     GamePosterThumbnail(
                         game = game,
-                        height = 110.dp,
-                        width = 80.dp
+                        height = 112.dp,
+                        width = 82.dp
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
@@ -217,26 +212,25 @@ fun GameDetailSheet(
             }
 
             Column(modifier = Modifier.padding(20.dp)) {
-                // Platforms & Status row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     GameStatusBadge(status = game.status)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        game.platforms.split(",").take(3).forEach {
-                            PlatformTag(platform = it.trim())
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        game.platforms.split(",").take(3).forEach { platform ->
+                            PlatformTag(platform = platform.trim())
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Scores comparison card
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.95f)),
+                    shape = RoundedCornerShape(18.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -248,7 +242,7 @@ fun GameDetailSheet(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(text = "تقييمك الشخصي", color = TextSecondary, fontSize = 12.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             if (game.userRating > 0f) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
@@ -277,13 +271,13 @@ fun GameDetailSheet(
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
-                                .height(40.dp)
+                                .height(42.dp)
                                 .background(BorderSubtle)
                         )
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "تقييم مجتمع الجيمرز", color = TextSecondary, fontSize = 12.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text = "تقييم المجتمع", color = TextSecondary, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Filled.Star,
@@ -304,8 +298,6 @@ fun GameDetailSheet(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // Synopsis
                 Text(
                     text = "نبذة عن اللعبة",
                     color = TextPrimary,
@@ -322,7 +314,6 @@ fun GameDetailSheet(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // User's Review & Diary Log Section
                 if (game.isLogged) {
                     Text(
                         text = "سجل تجربتك ومراجعتك",
@@ -333,8 +324,9 @@ fun GameDetailSheet(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
+                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant.copy(alpha = 0.95f)),
                         shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -346,7 +338,7 @@ fun GameDetailSheet(
                                 StarRatingDisplay(rating = game.userRating, starSize = 18.dp)
                                 if (game.hoursPlayed > 0f) {
                                     Surface(
-                                        color = CyberPrimary.copy(alpha = 0.2f),
+                                        color = CyberPrimary.copy(alpha = 0.18f),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Text(
@@ -380,8 +372,7 @@ fun GameDetailSheet(
                                 )
                             }
 
-                            // Sub-criteria progress bars
-                            if (game.subGameplayScore > 0f || game.subStoryScore > 0f) {
+                            if (game.subGameplayScore > 0f || game.subStoryScore > 0f || game.subVisualsScore > 0f || game.subAudioScore > 0f) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 HorizontalDivider(color = BorderSubtle)
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -398,12 +389,10 @@ fun GameDetailSheet(
                                 DetailScoreRow(label = "الموسيقى", score = game.subAudioScore)
                             }
 
-                            // Pros and Cons
                             if (game.pros.isNotBlank() || game.cons.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(12.dp))
                                 HorizontalDivider(color = BorderSubtle)
                                 Spacer(modifier = Modifier.height(10.dp))
-
                                 if (game.pros.isNotBlank()) {
                                     Text(
                                         text = "الإيجابيات: ${game.pros}",
@@ -425,7 +414,6 @@ fun GameDetailSheet(
                     Spacer(modifier = Modifier.height(20.dp))
                 }
 
-                // CTA Button: Add or Edit Review
                 Button(
                     onClick = onOpenReview,
                     colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
@@ -468,7 +456,7 @@ private fun DetailScoreRow(label: String, score: Float) {
             text = label,
             color = TextSecondary,
             fontSize = 11.sp,
-            modifier = Modifier.width(70.dp)
+            modifier = Modifier.width(72.dp)
         )
         LinearProgressIndicator(
             progress = { score / 10f },
