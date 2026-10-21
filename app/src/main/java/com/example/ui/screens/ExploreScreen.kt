@@ -1,9 +1,14 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,11 +45,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -105,7 +113,10 @@ fun ExploreScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(210.dp)
+                    .height(220.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.dp, CyberPrimary.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.img_hero_banner),
@@ -114,16 +125,15 @@ fun ExploreScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Dark gradient overlay
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    Color.Black.copy(alpha = 0.3f),
+                                    Color.Black.copy(alpha = 0.2f),
                                     Color.Black.copy(alpha = 0.7f),
-                                    DarkSurface
+                                    DarkSurface.copy(alpha = 0.95f)
                                 )
                             )
                         )
@@ -191,7 +201,6 @@ fun ExploreScreen(
             }
         }
 
-        // Search Bar
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 OutlinedTextField(
@@ -252,7 +261,6 @@ fun ExploreScreen(
             }
         }
 
-        // Genre filter row
         item {
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -281,7 +289,6 @@ fun ExploreScreen(
             }
         }
 
-        // Featured Spotlight section (only if no active search)
         if (searchQuery.isBlank() && selectedGenre == "All" && featuredGames.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
@@ -309,7 +316,6 @@ fun ExploreScreen(
             }
         }
 
-        // Section header for Games List
         item {
             Row(
                 modifier = Modifier
@@ -332,7 +338,6 @@ fun ExploreScreen(
             }
         }
 
-        // Games List items
         items(games) { game ->
             ExploreGameRowCard(
                 game = game,
@@ -350,13 +355,31 @@ fun FeaturedGameCard(
     onReviewClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        label = "featuredCardScale"
+    )
+    val cardColor by animateColorAsState(
+        targetValue = if (isPressed) CyberPrimary.copy(alpha = 0.18f) else DarkSurfaceVariant,
+        label = "featuredCardColor"
+    )
+
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-        shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = if (isPressed) 0.9f else 0.35f)),
         modifier = modifier
             .width(180.dp)
-            .clickable(onClick = onClick)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = if (isPressed) 18f else 10f
+                translationY = if (isPressed) 1f else 0f
+            }
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .testTag("featured_game_${game.id}")
     ) {
         Column {
@@ -430,14 +453,32 @@ fun ExploreGameRowCard(
     onReviewClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 280f),
+        label = "rowCardScale"
+    )
+    val accentColor by animateColorAsState(
+        targetValue = if (isPressed) CyberPrimary.copy(alpha = 0.12f) else DarkSurfaceVariant,
+        label = "rowCardAccent"
+    )
+
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-        shape = RoundedCornerShape(14.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+        colors = CardDefaults.cardColors(containerColor = accentColor),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isPressed) CyberPrimary.copy(alpha = 0.65f) else BorderSubtle),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 5.dp)
-            .clickable(onClick = onClick)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = if (isPressed) 1f else 0f
+                shadowElevation = if (isPressed) 12f else 6f
+            }
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .testTag("explore_game_card_${game.id}")
     ) {
         Row(
