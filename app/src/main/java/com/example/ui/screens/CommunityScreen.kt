@@ -97,7 +97,7 @@ fun CommunityScreen(
                     listOf(
                         DarkBackground,
                         DarkSurface,
-                        DarkSurfaceVariant
+                        DarkSurfaceVariant.copy(alpha = 0.95f)
                     )
                 )
             )
@@ -135,13 +135,13 @@ fun CommunityScreen(
                 }
 
                 Surface(
-                    color = CyberPrimary.copy(alpha = 0.18f),
+                    color = CyberPrimary.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Groups,
@@ -235,7 +235,7 @@ fun CommunityReviewCard(
         label = "communityCardScale"
     )
     val containerColor by animateColorAsState(
-        targetValue = if (isPressed) DarkSurfaceElevated.copy(alpha = 0.9f) else DarkSurfaceVariant.copy(alpha = 0.92f),
+        targetValue = if (isPressed) DarkSurfaceElevated.copy(alpha = 0.92f) else DarkSurfaceVariant.copy(alpha = 0.94f),
         label = "communityCardColor"
     )
 
@@ -248,7 +248,7 @@ fun CommunityReviewCard(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                shadowElevation = if (isPressed) 12f else 8f
+                shadowElevation = if (isPressed) 14f else 8f
                 translationY = if (isPressed) 1f else 0f
             }
             .clickable(interactionSource = interactionSource, indication = null, onClick = {})
