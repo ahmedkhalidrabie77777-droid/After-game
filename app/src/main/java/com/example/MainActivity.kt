@@ -1,19 +1,23 @@
 package com.example
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Bookmarks
@@ -23,27 +27,37 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Dialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.auth.AuthScreen
+import com.example.ui.auth.AuthManager
 import com.example.ui.dialogs.AddGameDialog
 import com.example.ui.dialogs.GameDetailSheet
 import com.example.ui.dialogs.ReviewDialog
@@ -52,6 +66,7 @@ import com.example.ui.screens.CommunityScreen
 import com.example.ui.screens.DiaryScreen
 import com.example.ui.screens.ExploreScreen
 import com.example.ui.screens.StatsScreen
+import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
 import com.example.ui.theme.DarkBackground
@@ -79,6 +94,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun RootAuthGate() {
     var currentUser by remember { mutableStateOf(Firebase.auth.currentUser) }
+    var showAuthDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val credentialManager = remember { CredentialManager.create(context) }
 
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { auth ->
@@ -90,19 +109,40 @@ fun RootAuthGate() {
         }
     }
 
-    if (currentUser == null) {
-        AuthScreen(
-            onAuthSuccess = {
-                currentUser = Firebase.auth.currentUser
+    AfterGameApp(
+        currentUser = currentUser,
+        onRequireAuth = { showAuthDialog = true }
+    )
+
+    if (showAuthDialog) {
+        AuthRequiredDialog(
+            onDismiss = { showAuthDialog = false },
+            onSignIn = {
+                AuthManager.onGoogleSignInClicked(
+                    context = context,
+                    credentialManager = credentialManager,
+                    onAuthSuccess = {
+                        currentUser = Firebase.auth.currentUser
+                        showAuthDialog = false
+                    },
+                    onAuthError = { error ->
+                        Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                        showAuthDialog = false
+                    },
+                    scope = coroutineScope,
+                    onAuthCancelled = { showAuthDialog = false }
+                )
             }
         )
-    } else {
-        AfterGameApp()
     }
 }
 
 @Composable
-fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
+fun AfterGameApp(
+    viewModel: GameViewModel = viewModel(),
+    currentUser: com.google.firebase.auth.FirebaseUser? = Firebase.auth.currentUser,
+    onRequireAuth: () -> Unit = {}
+) {
     val activeTab by viewModel.activeTab.collectAsStateWithLifecycle()
     val exploreGames by viewModel.exploreGames.collectAsStateWithLifecycle()
     val diaryGames by viewModel.diaryGames.collectAsStateWithLifecycle()
@@ -121,7 +161,6 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
     val selectedReviewForComments by viewModel.selectedReviewForComments.collectAsStateWithLifecycle()
     val activeComments by viewModel.activeComments.collectAsStateWithLifecycle()
 
-    // Handle back button for sub-sheets and tabs
     BackHandler(
         enabled = selectedReviewForComments != null || selectedDetailGame != null ||
             selectedReviewGame != null || isAddDialogOpen || activeTab != NavigationTab.EXPLORE
@@ -149,7 +188,6 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .testTag("main_bottom_nav")
             ) {
-                // 1. Explore Tab (اكتشف)
                 val isExplore = activeTab == NavigationTab.EXPLORE
                 NavigationBarItem(
                     selected = isExplore,
@@ -178,7 +216,6 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
                     modifier = Modifier.testTag("tab_explore")
                 )
 
-                // 2. Community Tab (المجتمع)
                 val isCommunity = activeTab == NavigationTab.COMMUNITY
                 NavigationBarItem(
                     selected = isCommunity,
@@ -207,7 +244,6 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
                     modifier = Modifier.testTag("tab_community")
                 )
 
-                // 3. Diary Tab (سجلي)
                 val isDiary = activeTab == NavigationTab.DIARY
                 NavigationBarItem(
                     selected = isDiary,
@@ -236,7 +272,6 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
                     modifier = Modifier.testTag("tab_diary")
                 )
 
-                // 4. Stats Tab (إحصائياتي)
                 val isStats = activeTab == NavigationTab.STATS
                 NavigationBarItem(
                     selected = isStats,
@@ -282,16 +317,24 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
                             selectedGenre = selectedGenre,
                             onGenreSelect = { viewModel.setSelectedGenre(it) },
                             onGameClick = { viewModel.openGameDetail(it) },
-                            onReviewClick = { viewModel.openReviewDialog(it) },
-                            onAddNewGameClick = { viewModel.setAddGameDialogOpen(true) },
+                            onReviewClick = { game ->
+                                if (currentUser == null) onRequireAuth() else viewModel.openReviewDialog(game)
+                            },
+                            onAddNewGameClick = {
+                                if (currentUser == null) onRequireAuth() else viewModel.setAddGameDialogOpen(true)
+                            },
                             isSearchingRawg = isSearchingRawg
                         )
                     }
                     NavigationTab.COMMUNITY -> {
                         CommunityScreen(
                             reviews = communityReviews,
-                            onLikeReview = { viewModel.likeReview(it) },
-                            onOpenComments = { viewModel.openCommentsForReview(it) }
+                            onLikeReview = { reviewId ->
+                                if (currentUser == null) onRequireAuth() else viewModel.likeReview(reviewId)
+                            },
+                            onOpenComments = { review ->
+                                if (currentUser == null) onRequireAuth() else viewModel.openCommentsForReview(review)
+                            }
                         )
                     }
                     NavigationTab.DIARY -> {
@@ -304,9 +347,15 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
                             sortOption = sortOption,
                             onSortOptionChange = { viewModel.setSortOption(it) },
                             onGameClick = { viewModel.openGameDetail(it) },
-                            onReviewClick = { viewModel.openReviewDialog(it) },
-                            onToggleFavorite = { viewModel.toggleFavorite(it) },
-                            onDeleteGame = { viewModel.deleteGame(it) },
+                            onReviewClick = { game ->
+                                if (currentUser == null) onRequireAuth() else viewModel.openReviewDialog(game)
+                            },
+                            onToggleFavorite = { game ->
+                                if (currentUser == null) onRequireAuth() else viewModel.toggleFavorite(game)
+                            },
+                            onDeleteGame = { game ->
+                                if (currentUser == null) onRequireAuth() else viewModel.deleteGame(game)
+                            },
                             onExploreClick = { viewModel.setActiveTab(NavigationTab.EXPLORE) }
                         )
                     }
@@ -322,25 +371,32 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
         }
     }
 
-    // Detail Sheet
     selectedDetailGame?.let { game ->
         GameDetailSheet(
             game = game,
             onDismiss = { viewModel.closeGameDetail() },
             onOpenReview = {
-                viewModel.openReviewDialog(game)
+                if (currentUser == null) onRequireAuth() else viewModel.openReviewDialog(game)
             },
-            onToggleFavorite = { viewModel.toggleFavorite(game) },
-            onDeleteGame = { viewModel.deleteGame(game) }
+            onToggleFavorite = { gameToToggle ->
+                if (currentUser == null) onRequireAuth() else viewModel.toggleFavorite(gameToToggle)
+            },
+            onDeleteGame = { gameToDelete ->
+                if (currentUser == null) onRequireAuth() else viewModel.deleteGame(gameToDelete)
+            }
         )
     }
 
-    // Review Dialog
     selectedReviewGame?.let { game ->
         ReviewDialog(
             game = game,
             onDismiss = { viewModel.closeReviewDialog() },
             onSave = { rating, status, hours, reviewTitle, reviewText, pros, cons, gameplay, story, visuals, audio, platformPlayed, isFav ->
+                if (currentUser == null) {
+                    onRequireAuth()
+                    viewModel.closeReviewDialog()
+                    return@ReviewDialog
+                }
                 viewModel.saveReview(
                     gameId = game.id,
                     userRating = rating,
@@ -361,11 +417,15 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
         )
     }
 
-    // Add Custom Game Dialog
     if (isAddDialogOpen) {
         AddGameDialog(
             onDismiss = { viewModel.setAddGameDialogOpen(false) },
             onAdd = { title, titleAr, developer, releaseYear, genres, platforms, synopsis, rating, status, hours, reviewText, platformPlayed ->
+                if (currentUser == null) {
+                    onRequireAuth()
+                    viewModel.setAddGameDialogOpen(false)
+                    return@AddGameDialog
+                }
                 viewModel.addCustomGame(
                     title = title,
                     titleAr = titleAr,
@@ -384,15 +444,100 @@ fun AfterGameApp(viewModel: GameViewModel = viewModel()) {
         )
     }
 
-    // Comments Sheet
     selectedReviewForComments?.let { review ->
         CommentsBottomSheet(
             review = review,
             comments = activeComments,
             onDismiss = { viewModel.closeComments() },
             onAddComment = { text ->
+                if (currentUser == null) {
+                    onRequireAuth()
+                    viewModel.closeComments()
+                    return@CommentsBottomSheet
+                }
                 viewModel.addComment(review.id, text)
             }
         )
+    }
+}
+
+@Composable
+fun AuthRequiredDialog(
+    onDismiss: () -> Unit,
+    onSignIn: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            color = DarkBackground,
+            shape = RoundedCornerShape(20.dp),
+            tonalElevation = 8.dp,
+            border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.5f)),
+            modifier = Modifier
+                .padding(16.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .border(1.dp, CyberPrimary.copy(alpha = 0.8f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Groups,
+                        contentDescription = null,
+                        tint = CyberPrimary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Text(
+                    text = "تسجيل الدخول مطلوب",
+                    color = com.example.ui.theme.TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+
+                Text(
+                    text = "لإكمال هذا التفاعل، سجل دخولك أولاً لمشاركة تقييمك أو التعليق مع المجتمع.",
+                    color = com.example.ui.theme.TextMuted,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+
+                Button(
+                    onClick = onSignIn,
+                    colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 18.dp)
+                        .sizeIn(minHeight = 48.dp)
+                ) {
+                    Text(
+                        text = "تسجيل الدخول عبر Google",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.padding(top = 6.dp)
+                ) {
+                    Text(
+                        text = "لاحقًا",
+                        color = CyberSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
     }
 }
