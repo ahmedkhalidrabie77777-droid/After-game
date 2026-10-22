@@ -237,14 +237,14 @@ private fun GuestProfileView(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-            // Infinity Controller Logo (Transparent background, prominent size)
+            // Infinity Controller Logo (Transparent background, compact size)
             Image(
                 painter = painterResource(id = R.drawable.ic_after_game_logo),
                 contentDescription = "After Game Logo",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .width(160.dp)
-                    .height(105.dp)
+                    .width(110.dp)
+                    .height(72.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))

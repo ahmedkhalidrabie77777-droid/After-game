@@ -127,8 +127,8 @@ fun AuthScreen(
                 contentDescription = "After Game Logo",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .width(160.dp)
-                    .height(105.dp)
+                    .width(110.dp)
+                    .height(72.dp)
             )
 
             Spacer(modifier = Modifier.height(18.dp))

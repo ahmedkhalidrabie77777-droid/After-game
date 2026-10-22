@@ -166,8 +166,8 @@ fun ExploreScreen(
                                 painter = painterResource(id = R.drawable.ic_after_game_logo),
                                 contentDescription = "After Game Logo",
                                 modifier = Modifier
-                                    .width(62.dp)
-                                    .height(41.dp),
+                                    .width(42.dp)
+                                    .height(28.dp),
                                 contentScale = ContentScale.Fit
                             )
                             Spacer(modifier = Modifier.width(10.dp))

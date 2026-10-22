@@ -129,8 +129,8 @@ fun HomeScreen(
                 painter = painterResource(id = R.drawable.ic_after_game_logo),
                 contentDescription = null,
                 modifier = Modifier
-                    .width(44.dp)
-                    .height(29.dp),
+                    .width(36.dp)
+                    .height(24.dp),
                 contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.width(8.dp))
