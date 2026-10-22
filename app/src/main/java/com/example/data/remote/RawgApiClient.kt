@@ -18,7 +18,9 @@ interface RawgApiService {
         @Query("page_size") pageSize: Int = 20,
         @Query("search") search: String? = null,
         @Query("genres") genres: String? = null,
-        @Query("ordering") ordering: String? = "-rating"
+        @Query("ordering") ordering: String? = "-added",
+        @Query("dates") dates: String? = null,
+        @Query("page") page: Int = 1
     ): RawgGamesResponse
 }
 

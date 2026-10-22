@@ -122,23 +122,14 @@ fun AuthScreen(
         ) {
             Spacer(modifier = Modifier.height(26.dp))
 
-            Box(
+            Image(
+                painter = painterResource(id = R.drawable.ic_after_game_logo),
+                contentDescription = "After Game Logo",
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .border(2.dp, CyberPrimary, CircleShape)
-                    .background(DarkSurfaceVariant.copy(alpha = 0.85f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_after_game_logo),
-                    contentDescription = "After Game Logo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(10.dp)
-                )
-            }
+                    .width(160.dp)
+                    .height(105.dp)
+            )
 
             Spacer(modifier = Modifier.height(18.dp))
 

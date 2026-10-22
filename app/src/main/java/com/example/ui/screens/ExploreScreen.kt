@@ -162,23 +162,15 @@ fun ExploreScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.weight(1f, fill = false)
                         ) {
-                            Box(
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_after_game_logo),
+                                contentDescription = "After Game Logo",
                                 modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(DarkSurfaceVariant.copy(alpha = 0.8f))
-                                    .border(1.5.dp, CyberPrimary, RoundedCornerShape(14.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.ic_after_game_logo),
-                                    contentDescription = "After Game Logo",
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
+                                    .width(62.dp)
+                                    .height(41.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
                                     text = "AFTER GAME",

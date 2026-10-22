@@ -22,7 +22,14 @@ data class RawgGameDto(
     @Json(name = "playtime") val playtime: Int = 0,
     @Json(name = "genres") val genres: List<RawgGenreDto> = emptyList(),
     @Json(name = "platforms") val platforms: List<RawgPlatformSlotDto> = emptyList(),
-    @Json(name = "description_raw") val descriptionRaw: String? = null
+    @Json(name = "description_raw") val descriptionRaw: String? = null,
+    @Json(name = "short_screenshots") val shortScreenshots: List<RawgScreenshotDto> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class RawgScreenshotDto(
+    @Json(name = "id") val id: Long = 0,
+    @Json(name = "image") val image: String = ""
 )
 
 @JsonClass(generateAdapter = true)

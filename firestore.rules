@@ -61,7 +61,7 @@ service cloud.firestore {
 
     // User Profiles
     match /users/{userId} {
-      allow get: if isSignedIn();
+      allow get: if true;
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() &&
                        request.auth.uid == userId &&
@@ -82,7 +82,7 @@ service cloud.firestore {
 
     // Community Public Game Reviews
     match /reviews/{reviewId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if true;
       allow create: if isSignedIn() &&
                        isValidId(reviewId) &&
                        incoming().userId == request.auth.uid &&
@@ -116,7 +116,7 @@ service cloud.firestore {
 
       // Comments Thread on Reviews
       match /comments/{commentId} {
-        allow get, list: if isSignedIn() && isValidId(reviewId);
+        allow get, list: if isValidId(reviewId);
         allow create: if isSignedIn() &&
                          isValidId(reviewId) &&
                          isValidId(commentId) &&

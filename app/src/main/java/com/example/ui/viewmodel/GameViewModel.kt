@@ -10,6 +10,7 @@ import com.example.data.firebase.FirestoreReviewRepository
 import com.example.data.local.AppDatabase
 import com.example.data.model.GameItem
 import com.example.data.remote.RawgApiClient
+import com.example.data.remote.RawgGameDto
 import com.example.data.repository.GameRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -25,6 +26,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class NavigationTab {
+    HOME,
+    DISCOVER,
+    COMPARE,
+    LISTS,
+    PROFILE,
     EXPLORE,
     COMMUNITY,
     DIARY,
@@ -52,18 +58,9 @@ data class GamerStats(
 )
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
-    private val localRepository: GameRepository
-    private val firestoreRepository: FirestoreReviewRepository
-
-    init {
-        val database = AppDatabase.getDatabase(application, viewModelScope)
-        localRepository = GameRepository(database.gameDao())
-        firestoreRepository = FirestoreReviewRepository(application)
-
-        viewModelScope.launch {
-            localRepository.seedIfEmpty()
-        }
-    }
+    private val database = AppDatabase.getDatabase(application, viewModelScope)
+    private val localRepository = GameRepository(database.gameDao())
+    private val firestoreRepository = FirestoreReviewRepository(application)
 
     val rawGames: StateFlow<List<GameItem>> = localRepository.allGames
         .stateIn(
@@ -84,8 +81,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    private val _activeTab = MutableStateFlow(NavigationTab.EXPLORE)
+    private val _activeTab = MutableStateFlow(NavigationTab.HOME)
     val activeTab: StateFlow<NavigationTab> = _activeTab.asStateFlow()
+
+    private val _compareGameA = MutableStateFlow<GameItem?>(null)
+    val compareGameA: StateFlow<GameItem?> = _compareGameA.asStateFlow()
+
+    private val _compareGameB = MutableStateFlow<GameItem?>(null)
+    val compareGameB: StateFlow<GameItem?> = _compareGameB.asStateFlow()
+
+    fun setCompareGameA(game: GameItem?) {
+        _compareGameA.value = game
+    }
+
+    fun setCompareGameB(game: GameItem?) {
+        _compareGameB.value = game
+    }
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -111,9 +122,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAddGameDialogOpen = MutableStateFlow(false)
     val isAddGameDialogOpen: StateFlow<Boolean> = _isAddGameDialogOpen.asStateFlow()
 
-    // RAWG Live API Search Results
-    private val _rawgApiGames = MutableStateFlow<List<GameItem>>(emptyList())
-    val rawgApiGames: StateFlow<List<GameItem>> = _rawgApiGames.asStateFlow()
+    // RAWG API Live Data Stores
+    private val _apiPopularGamesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
+    private val _apiTopRatedGamesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
+    private val _apiNewReleasesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
+    private val _apiExploreGamesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
+
+    private val _isLoadingApi = MutableStateFlow(false)
+    val isLoadingApi: StateFlow<Boolean> = _isLoadingApi.asStateFlow()
 
     private val _isSearchingRawg = MutableStateFlow(false)
     val isSearchingRawg: StateFlow<Boolean> = _isSearchingRawg.asStateFlow()
@@ -125,28 +141,97 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeComments = MutableStateFlow<List<FirebaseComment>>(emptyList())
     val activeComments: StateFlow<List<FirebaseComment>> = _activeComments.asStateFlow()
 
-    // Combined explore list (Local DB + Live RAWG API results)
-    val exploreGames: StateFlow<List<GameItem>> = combine(
-        rawGames,
-        _rawgApiGames,
-        _searchQuery,
-        _selectedGenre
-    ) { localGames, apiGames, query, genre ->
-        val source = if (apiGames.isNotEmpty() && query.isNotBlank()) {
-            apiGames
+    private fun mapDtoToGameItem(dto: RawgGameDto, localMap: Map<Long, GameItem>): GameItem {
+        val existing = localMap[dto.id] ?: localMap.values.find { it.title.equals(dto.name, ignoreCase = true) }
+        val platformNames = dto.platforms.mapNotNull { it.platform?.name }.take(4).joinToString(", ")
+            .ifBlank { "PC, PlayStation, Xbox" }
+        val genreNames = dto.genres.map { it.name }.take(3).joinToString(", ")
+            .ifBlank { "Action" }
+        val releaseYearVal = dto.released?.take(4)?.toIntOrNull() ?: 2024
+        val communityScore = if (dto.metacritic != null && dto.metacritic > 0) {
+            (dto.metacritic / 20f).coerceIn(0.5f, 5.0f)
+        } else if (dto.rating > 0f) {
+            (dto.rating).coerceIn(0.5f, 5.0f)
         } else {
-            localGames
+            4.5f
         }
+        val desc = dto.descriptionRaw?.ifBlank { null }
+            ?: "بيانات حية من قاعدة ألعاب RAWG لـ ${dto.name} مع ${dto.ratingsCount} تقييم عالمي ومتوسط ${String.format("%.1f", communityScore)}/5."
 
-        source.filter { game ->
-            val matchesQuery = query.isBlank() ||
-                game.title.contains(query, ignoreCase = true) ||
-                game.titleAr.contains(query, ignoreCase = true) ||
-                game.developer.contains(query, ignoreCase = true)
+        return GameItem(
+            id = dto.id,
+            title = dto.name,
+            titleAr = existing?.titleAr ?: "",
+            developer = "RAWG Database",
+            releaseYear = releaseYearVal,
+            platforms = platformNames,
+            genres = genreNames,
+            coverUrl = dto.backgroundImage ?: existing?.coverUrl ?: "",
+            synopsis = desc,
+            communityRating = communityScore,
+            userRating = existing?.userRating ?: 0f,
+            status = existing?.status ?: "NONE",
+            hoursPlayed = existing?.hoursPlayed ?: 0f,
+            userReview = existing?.userReview ?: "",
+            reviewTitle = existing?.reviewTitle ?: "",
+            pros = existing?.pros ?: "",
+            cons = existing?.cons ?: "",
+            subGameplayScore = existing?.subGameplayScore ?: 0f,
+            subStoryScore = existing?.subStoryScore ?: 0f,
+            subVisualsScore = existing?.subVisualsScore ?: 0f,
+            subAudioScore = existing?.subAudioScore ?: 0f,
+            isFavorite = existing?.isFavorite ?: false,
+            loggedDate = existing?.loggedDate ?: 0L,
+            platformPlayed = existing?.platformPlayed ?: "PC"
+        )
+    }
 
-            val matchesGenre = genre == "All" || game.genres.contains(genre, ignoreCase = true)
+    val popularGames: StateFlow<List<GameItem>> = combine(
+        _apiPopularGamesRaw,
+        rawGames
+    ) { apiList, localList ->
+        val localMap = localList.associateBy { it.id }
+        if (apiList.isNotEmpty()) {
+            apiList.map { mapDtoToGameItem(it, localMap) }
+        } else {
+            localList
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-            matchesQuery && matchesGenre
+    val topRatedGames: StateFlow<List<GameItem>> = combine(
+        _apiTopRatedGamesRaw,
+        rawGames
+    ) { apiList, localList ->
+        val localMap = localList.associateBy { it.id }
+        if (apiList.isNotEmpty()) {
+            apiList.map { mapDtoToGameItem(it, localMap) }
+        } else {
+            localList.sortedByDescending { it.communityRating }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val newReleases: StateFlow<List<GameItem>> = combine(
+        _apiNewReleasesRaw,
+        rawGames
+    ) { apiList, localList ->
+        val localMap = localList.associateBy { it.id }
+        if (apiList.isNotEmpty()) {
+            apiList.map { mapDtoToGameItem(it, localMap) }
+        } else {
+            localList.sortedByDescending { it.releaseYear }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Explore Screen games (Live from RAWG API based on search/genre, merged with local ratings)
+    val exploreGames: StateFlow<List<GameItem>> = combine(
+        _apiExploreGamesRaw,
+        rawGames
+    ) { apiList, localList ->
+        val localMap = localList.associateBy { it.id }
+        if (apiList.isNotEmpty()) {
+            apiList.map { mapDtoToGameItem(it, localMap) }
+        } else {
+            localList
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -224,16 +309,146 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GamerStats())
 
+    init {
+        viewModelScope.launch {
+            localRepository.seedIfEmpty()
+        }
+        fetchInitialApiGames()
+    }
+
     fun setActiveTab(tab: NavigationTab) {
         _activeTab.value = tab
     }
 
+    fun refreshApiGames() {
+        fetchInitialApiGames()
+    }
+
+    private fun fetchInitialApiGames() {
+        viewModelScope.launch {
+            _isLoadingApi.value = true
+            try {
+                // 1. Popular / Trending Games (TMDB-style trending)
+                val popResponse = withContext(Dispatchers.IO) {
+                    RawgApiClient.service.getGames(
+                        apiKey = RawgApiClient.apiKey,
+                        ordering = "-added",
+                        pageSize = 20
+                    )
+                }
+                if (popResponse.results.isNotEmpty()) {
+                    _apiPopularGamesRaw.value = popResponse.results
+                    if (_apiExploreGamesRaw.value.isEmpty()) {
+                        _apiExploreGamesRaw.value = popResponse.results
+                    }
+                    if (_compareGameA.value == null) {
+                        _compareGameA.value = mapDtoToGameItem(popResponse.results[0], emptyMap())
+                    }
+                    if (_compareGameB.value == null && popResponse.results.size > 1) {
+                        _compareGameB.value = mapDtoToGameItem(popResponse.results[1], emptyMap())
+                    }
+                }
+
+                // 2. Top-Rated Games of All Time
+                val topResponse = withContext(Dispatchers.IO) {
+                    RawgApiClient.service.getGames(
+                        apiKey = RawgApiClient.apiKey,
+                        ordering = "-metacritic",
+                        pageSize = 15
+                    )
+                }
+                if (topResponse.results.isNotEmpty()) {
+                    _apiTopRatedGamesRaw.value = topResponse.results
+                }
+
+                // 3. New Releases
+                val newResponse = withContext(Dispatchers.IO) {
+                    RawgApiClient.service.getGames(
+                        apiKey = RawgApiClient.apiKey,
+                        ordering = "-released",
+                        pageSize = 15
+                    )
+                }
+                if (newResponse.results.isNotEmpty()) {
+                    _apiNewReleasesRaw.value = newResponse.results
+                }
+            } catch (e: Exception) {
+                Log.w("GameViewModel", "RAWG API fetch error: ${e.message}")
+            } finally {
+                _isLoadingApi.value = false
+            }
+        }
+    }
+
+    private fun getRawgGenreSlug(genre: String): String? {
+        return when (genre.lowercase().trim()) {
+            "all", "الكل" -> null
+            "action rpg", "آكشن rpg" -> "action,role-playing-games-rpg"
+            "soulslike", "سولزلايك" -> null
+            "open world", "عالم مفتوح" -> "adventure,action"
+            "indie", "ألعاب مستقلة" -> "indie"
+            "adventure", "مغامرات" -> "adventure"
+            "horror", "رعب بقاء" -> null
+            "roguelike", "روغلايك" -> null
+            "shooter", "تصويب" -> "shooter"
+            "strategy", "استراتيجية" -> "strategy"
+            "racing", "سباقات" -> "racing"
+            else -> genre.lowercase().replace(" ", "-")
+        }
+    }
+
+    fun setSelectedGenre(genre: String) {
+        _selectedGenre.value = genre
+        if (_searchQuery.value.isBlank()) {
+            loadGamesByGenre(genre)
+        }
+    }
+
+    private fun loadGamesByGenre(genre: String) {
+        viewModelScope.launch {
+            _isLoadingApi.value = true
+            try {
+                val slug = getRawgGenreSlug(genre)
+                val response = withContext(Dispatchers.IO) {
+                    if (slug != null) {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            genres = slug,
+                            ordering = "-added",
+                            pageSize = 25
+                        )
+                    } else if (genre != "All" && genre != "الكل") {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            search = genre,
+                            ordering = "-rating",
+                            pageSize = 25
+                        )
+                    } else {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            ordering = "-added",
+                            pageSize = 25
+                        )
+                    }
+                }
+                if (response.results.isNotEmpty()) {
+                    _apiExploreGamesRaw.value = response.results
+                }
+            } catch (e: Exception) {
+                Log.w("GameViewModel", "RAWG genre error: ${e.message}")
+            } finally {
+                _isLoadingApi.value = false
+            }
+        }
+    }
+
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
-        if (query.length >= 3) {
-            searchRawgLive(query)
+        if (query.trim().length >= 2) {
+            searchRawgLive(query.trim())
         } else if (query.isBlank()) {
-            _rawgApiGames.value = emptyList()
+            loadGamesByGenre(_selectedGenre.value)
         }
     }
 
@@ -245,34 +460,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     RawgApiClient.service.getGames(
                         apiKey = RawgApiClient.apiKey,
                         search = query,
-                        pageSize = 15
+                        pageSize = 25
                     )
                 }
-                val converted = response.results.map { dto ->
-                    GameItem(
-                        id = dto.id,
-                        title = dto.name,
-                        titleAr = "",
-                        developer = "RAWG Database",
-                        releaseYear = dto.released?.take(4)?.toIntOrNull() ?: 2024,
-                        platforms = dto.platforms.mapNotNull { it.platform?.name }.take(4).joinToString(", ").ifBlank { "PC, Console" },
-                        genres = dto.genres.map { it.name }.take(3).joinToString(", ").ifBlank { "Action" },
-                        coverUrl = dto.backgroundImage ?: "",
-                        communityRating = (dto.rating).coerceIn(0f, 5f),
-                        synopsis = "بيانات مباشرة من RAWG Video Games Database لـ ${dto.name} مع ${dto.ratingsCount} تقييم عالمي."
-                    )
+                if (response.results.isNotEmpty()) {
+                    _apiExploreGamesRaw.value = response.results
                 }
-                _rawgApiGames.value = converted
             } catch (e: Exception) {
-                Log.w("GameViewModel", "RAWG search fallback to local", e)
+                Log.w("GameViewModel", "RAWG live search error: ${e.message}")
             } finally {
                 _isSearchingRawg.value = false
             }
         }
-    }
-
-    fun setSelectedGenre(genre: String) {
-        _selectedGenre.value = genre
     }
 
     fun setSelectedPlatform(platform: String) {
@@ -359,9 +558,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         isFavorite: Boolean
     ) {
         viewModelScope.launch {
-            // Find game from local or API results
-            val existing = rawGames.value.find { it.id == gameId }
-                ?: _rawgApiGames.value.find { it.id == gameId }
+            // Find game from API lists or local database
+            val existing = exploreGames.value.find { it.id == gameId }
+                ?: popularGames.value.find { it.id == gameId }
+                ?: topRatedGames.value.find { it.id == gameId }
+                ?: newReleases.value.find { it.id == gameId }
+                ?: rawGames.value.find { it.id == gameId }
                 ?: return@launch
 
             val updated = existing.copy(

@@ -34,7 +34,7 @@ class FirestoreReviewRepository(private val db: FirebaseFirestore) {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     handleFirestoreError(error, OperationType.LIST, path)
-                    close(error)
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
@@ -52,7 +52,7 @@ class FirestoreReviewRepository(private val db: FirebaseFirestore) {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     handleFirestoreError(error, OperationType.LIST, path)
-                    close(error)
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {

@@ -10,25 +10,31 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Dialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -53,18 +59,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.auth.AuthManager
-import com.example.ui.auth.AuthScreen
 import com.example.ui.dialogs.AddGameDialog
 import com.example.ui.dialogs.GameDetailSheet
 import com.example.ui.dialogs.ReviewDialog
 import com.example.ui.screens.CommentsBottomSheet
 import com.example.ui.screens.CommunityScreen
+import com.example.ui.screens.CompareScreen
 import com.example.ui.screens.DiaryScreen
 import com.example.ui.screens.ExploreScreen
+import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.ListsScreen
+import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.StatsScreen
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
@@ -77,6 +87,7 @@ import com.example.ui.viewmodel.GameViewModel
 import com.example.ui.viewmodel.NavigationTab
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.auth
 
 class MainActivity : ComponentActivity() {
@@ -109,37 +120,48 @@ fun RootAuthGate() {
         }
     }
 
-    if (currentUser == null) {
-        AuthScreen(
+    val launchSignInFlow: () -> Unit = {
+        AuthManager.onGoogleSignInClicked(
+            context = context,
+            credentialManager = credentialManager,
             onAuthSuccess = {
                 currentUser = Firebase.auth.currentUser
+                showAuthDialog = false
+                Toast.makeText(context, "تم تسجيل الدخول بنجاح!", Toast.LENGTH_SHORT).show()
+            },
+            onAuthError = { error ->
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                showAuthDialog = false
+            },
+            scope = coroutineScope,
+            onAuthCancelled = {
+                showAuthDialog = false
             }
         )
-    } else {
-        AfterGameApp(
-            onRequireAuth = { showAuthDialog = true }
-        )
     }
+
+    // App opens directly without blocking with an auth screen at startup!
+    AfterGameApp(
+        currentUser = currentUser,
+        onRequireAuth = { showAuthDialog = true },
+        onSignInClick = launchSignInFlow,
+        onSignOutClick = {
+            AuthManager.signOut(
+                context = context,
+                credentialManager = credentialManager,
+                onSignOutComplete = {
+                    currentUser = null
+                    Toast.makeText(context, "تم تسجيل الخروج", Toast.LENGTH_SHORT).show()
+                },
+                scope = coroutineScope
+            )
+        }
+    )
 
     if (showAuthDialog) {
         AuthRequiredDialog(
             onDismiss = { showAuthDialog = false },
-            onSignIn = {
-                AuthManager.onGoogleSignInClicked(
-                    context = context,
-                    credentialManager = credentialManager,
-                    onAuthSuccess = {
-                        currentUser = Firebase.auth.currentUser
-                        showAuthDialog = false
-                    },
-                    onAuthError = { error ->
-                        Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-                        showAuthDialog = false
-                    },
-                    scope = coroutineScope,
-                    onAuthCancelled = { showAuthDialog = false }
-                )
-            }
+            onSignIn = launchSignInFlow
         )
     }
 }
@@ -162,9 +184,9 @@ fun AuthRequiredDialog(
         ) {
             Box(
                 modifier = Modifier
-                    .padding(horizontal = 22.dp, vertical = 18.dp)
+                    .padding(horizontal = 22.dp, vertical = 20.dp)
             ) {
-                androidx.compose.foundation.layout.Column(
+                Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
@@ -185,34 +207,35 @@ fun AuthRequiredDialog(
                         )
                     }
 
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
                         text = "تسجيل الدخول مطلوب",
                         color = TextPrimary,
-                        fontSize = 20.sp,
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Bold
                     )
 
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "لإكمال هذا التفاعل، سجل دخولك أولاً لمشاركة تقييمك، تعليقك، أو مراجعتك مع المجتمع.",
+                        text = "لإكمال هذا التفاعل، سجل دخولك أولاً لمشاركة تقييمك، تعليقك، أو مراجعتك مع مجتمع After Game.",
                         color = TextMuted,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
                         textAlign = TextAlign.Center
                     )
 
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     Button(
                         onClick = onSignIn,
                         colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
-                            .fillMaxSize()
-                            .height(52.dp)
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("btn_dialog_signin")
                     ) {
                         Text(
                             text = "تسجيل الدخول عبر Google",
@@ -222,7 +245,7 @@ fun AuthRequiredDialog(
                         )
                     }
 
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     TextButton(
                         onClick = onDismiss
@@ -242,8 +265,11 @@ fun AuthRequiredDialog(
 
 @Composable
 fun AfterGameApp(
+    currentUser: FirebaseUser?,
     viewModel: GameViewModel = viewModel(),
-    onRequireAuth: () -> Unit = {}
+    onRequireAuth: () -> Unit = {},
+    onSignInClick: () -> Unit = {},
+    onSignOutClick: () -> Unit = {}
 ) {
     val activeTab by viewModel.activeTab.collectAsStateWithLifecycle()
     val exploreGames by viewModel.exploreGames.collectAsStateWithLifecycle()
@@ -256,6 +282,13 @@ fun AfterGameApp(
     val diaryStatusFilter by viewModel.diaryStatusFilter.collectAsStateWithLifecycle()
     val sortOption by viewModel.sortOption.collectAsStateWithLifecycle()
     val isSearchingRawg by viewModel.isSearchingRawg.collectAsStateWithLifecycle()
+    val popularGames by viewModel.popularGames.collectAsStateWithLifecycle()
+    val newReleases by viewModel.newReleases.collectAsStateWithLifecycle()
+    val topRatedGames by viewModel.topRatedGames.collectAsStateWithLifecycle()
+    val isLoadingApi by viewModel.isLoadingApi.collectAsStateWithLifecycle()
+
+    val compareGameA by viewModel.compareGameA.collectAsStateWithLifecycle()
+    val compareGameB by viewModel.compareGameB.collectAsStateWithLifecycle()
 
     val selectedDetailGame by viewModel.selectedGameForDetail.collectAsStateWithLifecycle()
     val selectedReviewGame by viewModel.selectedGameForReview.collectAsStateWithLifecycle()
@@ -263,18 +296,18 @@ fun AfterGameApp(
     val selectedReviewForComments by viewModel.selectedReviewForComments.collectAsStateWithLifecycle()
     val activeComments by viewModel.activeComments.collectAsStateWithLifecycle()
 
-    val isSignedIn = Firebase.auth.currentUser != null
+    val isSignedIn = currentUser != null
 
     BackHandler(
         enabled = selectedReviewForComments != null || selectedDetailGame != null ||
-            selectedReviewGame != null || isAddDialogOpen || activeTab != NavigationTab.EXPLORE
+            selectedReviewGame != null || isAddDialogOpen || activeTab != NavigationTab.HOME
     ) {
         when {
             selectedReviewForComments != null -> viewModel.closeComments()
             selectedReviewGame != null -> viewModel.closeReviewDialog()
             selectedDetailGame != null -> viewModel.closeGameDetail()
             isAddDialogOpen -> viewModel.setAddGameDialogOpen(false)
-            activeTab != NavigationTab.EXPLORE -> viewModel.setActiveTab(NavigationTab.EXPLORE)
+            activeTab != NavigationTab.HOME -> viewModel.setActiveTab(NavigationTab.HOME)
         }
     }
 
@@ -292,22 +325,23 @@ fun AfterGameApp(
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .testTag("main_bottom_nav")
             ) {
-                val isExplore = activeTab == NavigationTab.EXPLORE
+                // 1. Home Tab
+                val isHome = activeTab == NavigationTab.HOME
                 NavigationBarItem(
-                    selected = isExplore,
-                    onClick = { viewModel.setActiveTab(NavigationTab.EXPLORE) },
+                    selected = isHome,
+                    onClick = { viewModel.setActiveTab(NavigationTab.HOME) },
                     icon = {
                         Icon(
-                            imageVector = if (isExplore) Icons.Filled.Explore else Icons.Outlined.Explore,
-                            contentDescription = "Explore",
+                            imageVector = if (isHome) Icons.Filled.Home else Icons.Outlined.Home,
+                            contentDescription = "Home",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "اكتشف",
+                            text = "Home",
                             fontSize = 11.sp,
-                            fontWeight = if (isExplore) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (isHome) FontWeight.Bold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
@@ -317,53 +351,26 @@ fun AfterGameApp(
                         unselectedIconColor = TextMuted,
                         unselectedTextColor = TextMuted
                     ),
-                    modifier = Modifier.testTag("tab_explore")
+                    modifier = Modifier.testTag("tab_home")
                 )
 
-                val isCommunity = activeTab == NavigationTab.COMMUNITY
+                // 2. Discover Tab
+                val isDiscover = activeTab == NavigationTab.DISCOVER || activeTab == NavigationTab.EXPLORE
                 NavigationBarItem(
-                    selected = isCommunity,
-                    onClick = { viewModel.setActiveTab(NavigationTab.COMMUNITY) },
+                    selected = isDiscover,
+                    onClick = { viewModel.setActiveTab(NavigationTab.DISCOVER) },
                     icon = {
                         Icon(
-                            imageVector = if (isCommunity) Icons.Filled.Groups else Icons.Outlined.Groups,
-                            contentDescription = "Community",
+                            imageVector = if (isDiscover) Icons.Filled.Explore else Icons.Outlined.Explore,
+                            contentDescription = "Discover",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "المجتمع",
+                            text = "Discover",
                             fontSize = 11.sp,
-                            fontWeight = if (isCommunity) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.White,
-                        selectedTextColor = CyberSecondary,
-                        indicatorColor = CyberSecondary,
-                        unselectedIconColor = TextMuted,
-                        unselectedTextColor = TextMuted
-                    ),
-                    modifier = Modifier.testTag("tab_community")
-                )
-
-                val isDiary = activeTab == NavigationTab.DIARY
-                NavigationBarItem(
-                    selected = isDiary,
-                    onClick = { viewModel.setActiveTab(NavigationTab.DIARY) },
-                    icon = {
-                        Icon(
-                            imageVector = if (isDiary) Icons.Filled.Bookmarks else Icons.Outlined.Bookmarks,
-                            contentDescription = "Diary",
-                            modifier = Modifier.size(22.dp)
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "سجلي",
-                            fontSize = 11.sp,
-                            fontWeight = if (isDiary) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (isDiscover) FontWeight.Bold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
@@ -373,25 +380,26 @@ fun AfterGameApp(
                         unselectedIconColor = TextMuted,
                         unselectedTextColor = TextMuted
                     ),
-                    modifier = Modifier.testTag("tab_diary")
+                    modifier = Modifier.testTag("tab_discover")
                 )
 
-                val isStats = activeTab == NavigationTab.STATS
+                // 3. Compare Tab
+                val isCompare = activeTab == NavigationTab.COMPARE
                 NavigationBarItem(
-                    selected = isStats,
-                    onClick = { viewModel.setActiveTab(NavigationTab.STATS) },
+                    selected = isCompare,
+                    onClick = { viewModel.setActiveTab(NavigationTab.COMPARE) },
                     icon = {
                         Icon(
-                            imageVector = if (isStats) Icons.Filled.BarChart else Icons.Outlined.BarChart,
-                            contentDescription = "Stats",
+                            imageVector = if (isCompare) Icons.Filled.CompareArrows else Icons.Outlined.CompareArrows,
+                            contentDescription = "Compare",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "إحصائياتي",
+                            text = "Compare",
                             fontSize = 11.sp,
-                            fontWeight = if (isStats) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (isCompare) FontWeight.Bold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
@@ -401,7 +409,65 @@ fun AfterGameApp(
                         unselectedIconColor = TextMuted,
                         unselectedTextColor = TextMuted
                     ),
-                    modifier = Modifier.testTag("tab_stats")
+                    modifier = Modifier.testTag("tab_compare")
+                )
+
+                // 4. Lists Tab
+                val isLists = activeTab == NavigationTab.LISTS || activeTab == NavigationTab.DIARY
+                NavigationBarItem(
+                    selected = isLists,
+                    onClick = { viewModel.setActiveTab(NavigationTab.LISTS) },
+                    icon = {
+                        Icon(
+                            imageVector = if (isLists) Icons.Filled.Bookmarks else Icons.Outlined.Bookmarks,
+                            contentDescription = "Lists",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Lists",
+                            fontSize = 11.sp,
+                            fontWeight = if (isLists) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.White,
+                        selectedTextColor = CyberPrimary,
+                        indicatorColor = CyberPrimary,
+                        unselectedIconColor = TextMuted,
+                        unselectedTextColor = TextMuted
+                    ),
+                    modifier = Modifier.testTag("tab_lists")
+                )
+
+                // 5. Profile Tab
+                val isProfile = activeTab == NavigationTab.PROFILE || activeTab == NavigationTab.STATS
+                NavigationBarItem(
+                    selected = isProfile,
+                    onClick = { viewModel.setActiveTab(NavigationTab.PROFILE) },
+                    icon = {
+                        Icon(
+                            imageVector = if (isProfile) Icons.Filled.Person else Icons.Outlined.Person,
+                            contentDescription = "Profile",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Profile",
+                            fontSize = 11.sp,
+                            fontWeight = if (isProfile) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.White,
+                        selectedTextColor = CyberPrimary,
+                        indicatorColor = CyberPrimary,
+                        unselectedIconColor = TextMuted,
+                        unselectedTextColor = TextMuted
+                    ),
+                    modifier = Modifier.testTag("tab_profile")
                 )
             }
         }
@@ -413,7 +479,31 @@ fun AfterGameApp(
         ) {
             Crossfade(targetState = activeTab, label = "tab_fade") { tab ->
                 when (tab) {
-                    NavigationTab.EXPLORE -> {
+                    NavigationTab.HOME -> {
+                        HomeScreen(
+                            games = exploreGames,
+                            reviews = communityReviews,
+                            currentUser = currentUser,
+                            onGameClick = { viewModel.openGameDetail(it) },
+                            onReviewClick = {
+                                if (isSignedIn) viewModel.openReviewDialog(it) else onRequireAuth()
+                            },
+                            onLikeReview = {
+                                if (isSignedIn) viewModel.likeReview(it) else onRequireAuth()
+                            },
+                            onOpenComments = {
+                                if (isSignedIn) viewModel.openCommentsForReview(it) else onRequireAuth()
+                            },
+                            onRequireAuth = onRequireAuth,
+                            onOpenListsTab = { viewModel.setActiveTab(NavigationTab.LISTS) },
+                            popularGames = popularGames,
+                            newReleases = newReleases,
+                            topRatedGames = topRatedGames,
+                            isLoadingApi = isLoadingApi
+                        )
+                    }
+
+                    NavigationTab.DISCOVER, NavigationTab.EXPLORE -> {
                         ExploreScreen(
                             games = exploreGames,
                             searchQuery = searchQuery,
@@ -427,9 +517,40 @@ fun AfterGameApp(
                             onAddNewGameClick = {
                                 if (isSignedIn) viewModel.setAddGameDialogOpen(true) else onRequireAuth()
                             },
-                            isSearchingRawg = isSearchingRawg
+                            isSearchingRawg = isSearchingRawg || isLoadingApi
                         )
                     }
+
+                    NavigationTab.COMPARE -> {
+                        CompareScreen(
+                            gameA = compareGameA,
+                            gameB = compareGameB,
+                            allGames = exploreGames,
+                            onSelectGameA = { viewModel.setCompareGameA(it) },
+                            onSelectGameB = { viewModel.setCompareGameB(it) }
+                        )
+                    }
+
+                    NavigationTab.LISTS, NavigationTab.DIARY -> {
+                        ListsScreen(
+                            userGames = diaryGames,
+                            onGameClick = { viewModel.openGameDetail(it) },
+                            onAddNewListClick = {
+                                if (isSignedIn) viewModel.setAddGameDialogOpen(true) else onRequireAuth()
+                            }
+                        )
+                    }
+
+                    NavigationTab.PROFILE, NavigationTab.STATS -> {
+                        ProfileScreen(
+                            currentUser = currentUser,
+                            stats = stats,
+                            onSignInClick = onSignInClick,
+                            onSignOutClick = onSignOutClick,
+                            onNavigateToDiary = { viewModel.setActiveTab(NavigationTab.LISTS) }
+                        )
+                    }
+
                     NavigationTab.COMMUNITY -> {
                         CommunityScreen(
                             reviews = communityReviews,
@@ -438,37 +559,6 @@ fun AfterGameApp(
                             },
                             onOpenComments = { review ->
                                 if (isSignedIn) viewModel.openCommentsForReview(review) else onRequireAuth()
-                            }
-                        )
-                    }
-                    NavigationTab.DIARY -> {
-                        DiaryScreen(
-                            games = diaryGames,
-                            statusFilter = diaryStatusFilter,
-                            onStatusFilterChange = { viewModel.setDiaryStatusFilter(it) },
-                            platformFilter = selectedPlatform,
-                            onPlatformFilterChange = { viewModel.setSelectedPlatform(it) },
-                            sortOption = sortOption,
-                            onSortOptionChange = { viewModel.setSortOption(it) },
-                            onGameClick = { viewModel.openGameDetail(it) },
-                            onReviewClick = {
-                                if (isSignedIn) viewModel.openReviewDialog(it) else onRequireAuth()
-                            },
-                            onToggleFavorite = {
-                                if (isSignedIn) viewModel.toggleFavorite(it) else onRequireAuth()
-                            },
-                            onDeleteGame = {
-                                if (isSignedIn) viewModel.deleteGame(it) else onRequireAuth()
-                            },
-                            onExploreClick = { viewModel.setActiveTab(NavigationTab.EXPLORE) }
-                        )
-                    }
-                    NavigationTab.STATS -> {
-                        StatsScreen(
-                            stats = stats,
-                            onGameClick = { viewModel.openGameDetail(it) },
-                            onResetDefaults = {
-                                if (isSignedIn) viewModel.resetToDefaults() else onRequireAuth()
                             }
                         )
                     }
