@@ -1,5 +1,10 @@
 package com.example.ui.dialogs
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,13 +25,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Recommend
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.ThumbDown
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,11 +49,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
@@ -49,6 +63,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,19 +73,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.GameItem
-import com.example.ui.components.GamePosterThumbnail
-import com.example.ui.components.InteractiveStarRatingBar
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
+import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
-import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.GoldStar
+import com.example.ui.theme.StarBackground
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -99,55 +114,44 @@ fun ReviewDialog(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var rating by remember { mutableFloatStateOf(if (game.userRating > 0f) game.userRating else 4.0f) }
-    var status by remember { mutableStateOf(if (game.status != "NONE") game.status else "COMPLETED") }
-    var hours by remember { mutableFloatStateOf(game.hoursPlayed) }
-    var reviewTitle by remember { mutableStateOf(game.reviewTitle) }
+    var thumbsUp by remember { mutableStateOf(true) }
     var reviewText by remember { mutableStateOf(game.userReview) }
-    var pros by remember { mutableStateOf(game.pros) }
-    var cons by remember { mutableStateOf(game.cons) }
+    var isDetailedAccordionOpen by remember { mutableStateOf(false) }
+
+    // Detailed scores
     var gameplayScore by remember { mutableFloatStateOf(if (game.subGameplayScore > 0f) game.subGameplayScore else 8.5f) }
     var storyScore by remember { mutableFloatStateOf(if (game.subStoryScore > 0f) game.subStoryScore else 8.0f) }
     var visualsScore by remember { mutableFloatStateOf(if (game.subVisualsScore > 0f) game.subVisualsScore else 9.0f) }
     var audioScore by remember { mutableFloatStateOf(if (game.subAudioScore > 0f) game.subAudioScore else 8.5f) }
-    var platformPlayed by remember { mutableStateOf(game.platformPlayed.ifBlank { "PlayStation 5" }) }
-    var isFavorite by remember { mutableStateOf(game.isFavorite) }
 
-    val statusOptions = listOf(
-        "PLAYING" to "ألعبها الآن",
-        "COMPLETED" to "مكتملة",
-        "BACKLOG" to "في الانتظار",
-        "MASTERED" to "100% بلاتينيوم",
-        "DROPPED" to "متوقفة"
-    )
+    // Additional inputs matching Video 3:
+    var hoursInputText by remember { mutableStateOf(if (game.hoursPlayed > 0f) game.hoursPlayed.toInt().toString() else "25") }
+    var selectedPlatform by remember { mutableStateOf(game.platformPlayed.ifBlank { "PlayStation 5" }) }
+    var playPeriod by remember { mutableStateOf("2024 - 2026") }
+    var timesCompleted by remember { mutableIntStateOf(1) }
+    var isRecommended by remember { mutableStateOf(true) }
+    var isPlayedWithFriends by remember { mutableStateOf(false) }
 
-    val platformsList = listOf(
-        "PlayStation 5",
-        "PC",
-        "Xbox Series X",
-        "Nintendo Switch",
-        "Steam Deck",
-        "PS4",
-        "Xbox One"
-    )
+    val platformOptions = listOf("PlayStation 5", "PC", "Xbox Series X", "Nintendo Switch")
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = DarkSurface,
+        containerColor = DarkBackground,
         dragHandle = null
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.92f)
-                .padding(horizontal = 20.dp)
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Header Row
+            // Header Bar: "اكتب مراجعة" with Close button on right (Video 3)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -155,38 +159,81 @@ fun ReviewDialog(
                     onClick = onDismiss,
                     modifier = Modifier
                         .size(36.dp)
-                        .background(DarkSurfaceVariant, CircleShape)
-                        .testTag("close_review_button")
+                        .background(DarkSurface, CircleShape)
+                        .border(1.dp, BorderSubtle, CircleShape)
+                        .testTag("btn_close_review")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(20.dp)
+                        tint = TextMuted,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
                 Text(
-                    text = "تسجيل ومراجعة اللعبة",
+                    text = "اكتب مراجعة",
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
 
+                Spacer(modifier = Modifier.size(36.dp))
+            }
+
+            // Subtitle: "التقييم العام (اختياري)"
+            Text(
+                text = "التقييم العام (اختياري)",
+                color = TextMuted,
+                fontSize = 12.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Stars Row + Thumbs Up Toggle (Video 3 00:10)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 5 Interactive Stars
+                for (i in 1..5) {
+                    val isFilled = rating >= i
+                    IconButton(
+                        onClick = { rating = i.toFloat() },
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFilled) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                            contentDescription = "Star $i",
+                            tint = if (isFilled) GoldStar else StarBackground,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Thumbs Up / Down Toggle
                 IconButton(
-                    onClick = { isFavorite = !isFavorite },
+                    onClick = { thumbsUp = !thumbsUp },
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(42.dp)
                         .background(
-                            if (isFavorite) Color(0xFFEF4444).copy(alpha = 0.2f) else DarkSurfaceVariant,
+                            if (thumbsUp) Color(0xFF10B981).copy(alpha = 0.2f) else DarkSurface,
                             CircleShape
                         )
-                        .testTag("favorite_toggle_button")
+                        .border(
+                            1.dp,
+                            if (thumbsUp) Color(0xFF10B981) else BorderSubtle,
+                            CircleShape
+                        )
                 ) {
                     Icon(
-                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isFavorite) Color(0xFFEF4444) else TextSecondary,
+                        imageVector = if (thumbsUp) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
+                        contentDescription = "Thumbs",
+                        tint = if (thumbsUp) Color(0xFF10B981) else TextMuted,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -194,430 +241,335 @@ fun ReviewDialog(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Game banner card
+            // Review Input: "أضف مراجعة..."
+            OutlinedTextField(
+                value = reviewText,
+                onValueChange = { reviewText = it },
+                placeholder = {
+                    Text(text = "أضف مراجعة...", color = TextMuted, fontSize = 13.sp)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(115.dp)
+                    .testTag("input_review_text"),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = DarkSurface,
+                    unfocusedContainerColor = DarkSurface,
+                    focusedBorderColor = CyberPrimary,
+                    unfocusedBorderColor = BorderSubtle,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                shape = RoundedCornerShape(14.dp)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Expandable Accordion: "التقييمات التفصيلية" (Video 3 00:10)
             Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isDetailedAccordionOpen = !isDetailedAccordionOpen }
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    GamePosterThumbnail(
-                        game = game,
-                        height = 90.dp,
-                        width = 65.dp
-                    )
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = game.title,
+                            text = "التقييمات التفصيلية",
                             color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        if (game.titleAr.isNotBlank()) {
-                            Text(
-                                text = game.titleAr,
-                                color = CyberSecondary,
-                                fontSize = 13.sp
-                            )
+                        Icon(
+                            imageVector = if (isDetailedAccordionOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = CyberPrimary
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = isDetailedAccordionOpen,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(modifier = Modifier.padding(top = 12.dp)) {
+                            SubScoreSliderRow("أسلوب اللعب (Gameplay)", gameplayScore) { gameplayScore = it }
+                            SubScoreSliderRow("القصة والحوارات (Story)", storyScore) { storyScore = it }
+                            SubScoreSliderRow("الرسوم والتصميم (Visuals)", visualsScore) { visualsScore = it }
+                            SubScoreSliderRow("الموسيقى والمؤثرات (Audio)", audioScore) { audioScore = it }
                         }
-                        Text(
-                            text = "${game.developer} • ${game.releaseYear}",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            text = game.genres,
-                            color = TextMuted,
-                            fontSize = 11.sp
-                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // 1. Star Rating
-            Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "تقييمك للعبة (من 5 نجوم)",
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (rating > 0f) "${String.format("%.1f", rating)} / 5.0" else "غير مقيمة بعد",
-                        color = GoldStar,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    InteractiveStarRatingBar(
-                        rating = rating,
-                        onRatingChanged = { rating = it },
-                        starSize = 36.dp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 2. Status Selector
-            Text(
-                text = "حالة اللعب",
-                color = TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                statusOptions.forEach { (key, label) ->
-                    val isSelected = status == key
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { status = key },
-                        label = {
-                            Text(
-                                text = label,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = CyberPrimary,
-                            selectedLabelColor = Color.White,
-                            containerColor = DarkSurfaceVariant,
-                            labelColor = TextSecondary
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = if (isSelected) CyberPrimary else BorderSubtle
-                        ),
-                        modifier = Modifier.testTag("status_chip_$key")
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 3. Platform Played & Hours
+            // Two-column layout for Hours & Platform (Video 3 00:10)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Hours Counter Card
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "ساعات اللعب",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${hours.toInt()} ساعة",
-                            color = CyberSecondary,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { hours = (hours - 5f).coerceAtLeast(0f) },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(DarkSurfaceElevated, CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Remove,
-                                    contentDescription = "Minus",
-                                    tint = TextPrimary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            IconButton(
-                                onClick = { hours += 5f },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(DarkSurfaceElevated, CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Plus",
-                                    tint = TextPrimary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
+                // "إجمالي ساعات اللعبة / مثال: 120"
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "إجمالي ساعات اللعبة",
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = hoursInputText,
+                        onValueChange = { hoursInputText = it },
+                        placeholder = { Text("مثال: 120", color = TextMuted, fontSize = 12.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = DarkSurface,
+                            unfocusedContainerColor = DarkSurface,
+                            focusedBorderColor = CyberPrimary,
+                            unfocusedBorderColor = BorderSubtle,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
-                // Platform Played
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                // "فترة اللعب"
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "فترة اللعب",
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = playPeriod,
+                        onValueChange = { playPeriod = it },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = DarkSurface,
+                            unfocusedContainerColor = DarkSurface,
+                            focusedBorderColor = CyberPrimary,
+                            unfocusedBorderColor = BorderSubtle,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Platform Selector: "المنصة"
+            Text(
+                text = "المنصة",
+                color = TextMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                platformOptions.forEach { plat ->
+                    val isSelected = selectedPlatform == plat
+                    Surface(
+                        color = if (isSelected) CyberPrimary.copy(alpha = 0.2f) else DarkSurface,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelected) CyberPrimary else BorderSubtle
+                        ),
+                        modifier = Modifier.clickable { selectedPlatform = plat }
                     ) {
                         Text(
-                            text = "جهاز اللعب",
-                            color = TextSecondary,
-                            fontSize = 12.sp
+                            text = plat,
+                            color = if (isSelected) CyberPrimary else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = platformPlayed,
-                            color = TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        // Quick toggle through platforms
-                        OutlinedButton(
-                            onClick = {
-                                val curIndex = platformsList.indexOf(platformPlayed)
-                                val nextIndex = (curIndex + 1) % platformsList.size
-                                platformPlayed = platformsList[nextIndex]
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(text = "تغيير الجهاز", fontSize = 11.sp, color = CyberPrimary)
-                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // 4. Detailed Review Notes
-            Text(
-                text = "مراجعتك الخاصة",
-                color = TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = reviewTitle,
-                onValueChange = { reviewTitle = it },
-                label = { Text("عنوان المراجعة (مثال: تجربة لا تنسى)") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DarkSurfaceVariant,
-                    unfocusedContainerColor = DarkSurfaceVariant,
-                    focusedBorderColor = CyberPrimary,
-                    unfocusedBorderColor = BorderSubtle,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                shape = RoundedCornerShape(12.dp),
+            // "عدد مرات التختيم" with [-] 1 [+]
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("review_title_input")
-            )
+                    .background(DarkSurface, RoundedCornerShape(12.dp))
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "عدد مرات التختيم",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { if (timesCompleted > 1) timesCompleted-- },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(DarkSurfaceElevated, CircleShape)
+                    ) {
+                        Icon(imageVector = Icons.Default.Remove, contentDescription = "Decrease", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                    }
 
-            OutlinedTextField(
-                value = reviewText,
-                onValueChange = { reviewText = it },
-                label = { Text("اكتب رأيك وتفاصيل تجربتك مع اللعبة...") },
-                minLines = 3,
-                maxLines = 6,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DarkSurfaceVariant,
-                    unfocusedContainerColor = DarkSurfaceVariant,
-                    focusedBorderColor = CyberPrimary,
-                    unfocusedBorderColor = BorderSubtle,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("review_body_input")
-            )
+                    Text(
+                        text = "$timesCompleted",
+                        color = CyberPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                    IconButton(
+                        onClick = { timesCompleted++ },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(DarkSurfaceElevated, CircleShape)
+                    ) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Increase", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
 
-            // 5. Pros and Cons
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Toggles: "وصاني" & "لعبتها مع"
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                OutlinedTextField(
-                    value = pros,
-                    onValueChange = { pros = it },
-                    label = { Text("الإيجابيات (مفصولة بفواصل)") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = DarkSurfaceVariant,
-                        unfocusedContainerColor = DarkSurfaceVariant,
-                        focusedBorderColor = Color(0xFF34D399),
-                        unfocusedBorderColor = BorderSubtle,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
+                Surface(
+                    color = if (isRecommended) CyberPrimary.copy(alpha = 0.2f) else DarkSurface,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f)
-                )
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isRecommended) CyberPrimary else BorderSubtle),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { isRecommended = !isRecommended }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(imageVector = Icons.Default.Recommend, contentDescription = null, tint = if (isRecommended) CyberPrimary else TextMuted, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "وصاني", color = if (isRecommended) CyberPrimary else TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
 
-                OutlinedTextField(
-                    value = cons,
-                    onValueChange = { cons = it },
-                    label = { Text("السلبيات (مفصولة بفواصل)") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = DarkSurfaceVariant,
-                        unfocusedContainerColor = DarkSurfaceVariant,
-                        focusedBorderColor = Color(0xFFF87171),
-                        unfocusedBorderColor = BorderSubtle,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
+                Surface(
+                    color = if (isPlayedWithFriends) CyberSecondary.copy(alpha = 0.2f) else DarkSurface,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 6. Sub-criteria Scores (1-10)
-            Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "تفصيل درجات العناصر (من 10)",
-                        color = TextPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    SubScoreSlider(label = "أسلوب اللعب (Gameplay)", score = gameplayScore) { gameplayScore = it }
-                    SubScoreSlider(label = "القصة والشخصيات (Story)", score = storyScore) { storyScore = it }
-                    SubScoreSlider(label = "الرسومات والعالم (Visuals)", score = visualsScore) { visualsScore = it }
-                    SubScoreSlider(label = "الموسيقى والصوتيات (Audio)", score = audioScore) { audioScore = it }
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isPlayedWithFriends) CyberSecondary else BorderSubtle),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { isPlayedWithFriends = !isPlayedWithFriends }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(imageVector = Icons.Default.People, contentDescription = null, tint = if (isPlayedWithFriends) CyberSecondary else TextMuted, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "لعبتها مع أصدقاء", color = if (isPlayedWithFriends) CyberSecondary else TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
-            // Actions: Save & Cancel
+            // Save Button: "حفظ" (Video 3 00:10)
             Button(
                 onClick = {
+                    val parsedHours = hoursInputText.toFloatOrNull() ?: game.hoursPlayed
                     onSave(
                         rating,
-                        status,
-                        hours,
-                        reviewTitle,
+                        if (timesCompleted > 0) "COMPLETED" else "PLAYING",
+                        parsedHours,
+                        if (isRecommended) "يوصى بها بشدة" else "",
                         reviewText,
-                        pros,
-                        cons,
+                        if (isRecommended) "تجربة متكاملة وممتعة" else "",
+                        "",
                         gameplayScore,
                         storyScore,
                         visualsScore,
                         audioScore,
-                        platformPlayed,
-                        isFavorite
+                        selectedPlatform,
+                        thumbsUp
                     )
+                    onDismiss()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .testTag("save_review_button")
+                    .testTag("btn_save_review")
             ) {
                 Text(
-                    text = "حفظ المراجعة في السجل",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    text = "حفظ",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                Text(text = "إلغاء")
-            }
-
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-private fun SubScoreSlider(
-    label: String,
+private fun SubScoreSliderRow(
+    title: String,
     score: Float,
-    onScoreChanged: (Float) -> Unit
+    onScoreChange: (Float) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = label, color = TextSecondary, fontSize = 12.sp)
+            Text(text = title, color = TextSecondary, fontSize = 12.sp)
             Text(
-                text = "${String.format("%.1f", score)} / 10",
-                color = CyberSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
+                text = String.format("%.1f/10", score),
+                color = CyberPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
             )
         }
         Slider(
             value = score,
-            onValueChange = onScoreChanged,
+            onValueChange = onScoreChange,
             valueRange = 1f..10f,
-            steps = 17, // 0.5 increments
+            steps = 17,
             colors = SliderDefaults.colors(
-                thumbColor = CyberSecondary,
+                thumbColor = CyberPrimary,
                 activeTrackColor = CyberPrimary,
-                inactiveTrackColor = DarkSurfaceElevated
+                inactiveTrackColor = BorderSubtle
             )
         )
     }

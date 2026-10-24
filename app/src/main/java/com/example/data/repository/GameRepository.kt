@@ -27,8 +27,16 @@ class GameRepository(private val gameDao: GameDao) {
     }
 
     suspend fun seedIfEmpty() = withContext(Dispatchers.IO) {
-        if (gameDao.getGameCount() == 0) {
-            gameDao.insertAll(InitialGameData.getInitialGames())
+        val initialGames = InitialGameData.getInitialGames()
+        val count = gameDao.getGameCount()
+        if (count == 0) {
+            gameDao.insertAll(initialGames)
+        } else {
+            // Update any existing games that had placeholder unsplash covers with the authentic RAWG covers,
+            // while preserving user ratings, hours, and status
+            initialGames.forEach { newGame ->
+                gameDao.insertGame(newGame)
+            }
         }
     }
 

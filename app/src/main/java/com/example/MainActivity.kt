@@ -63,10 +63,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.model.GameItem
 import com.example.ui.auth.AuthManager
+import com.example.ui.components.RadialGameActionMenu
 import com.example.ui.dialogs.AddGameDialog
-import com.example.ui.dialogs.GameDetailSheet
 import com.example.ui.dialogs.ReviewDialog
+import com.example.ui.screens.GameDetailScreen
 import com.example.ui.screens.CommentsBottomSheet
 import com.example.ui.screens.CommunityScreen
 import com.example.ui.screens.CompareScreen
@@ -76,6 +78,7 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.ListsScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.StatsScreen
+import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
 import com.example.ui.theme.DarkBackground
@@ -284,6 +287,7 @@ fun AfterGameApp(
     val isSearchingRawg by viewModel.isSearchingRawg.collectAsStateWithLifecycle()
     val popularGames by viewModel.popularGames.collectAsStateWithLifecycle()
     val newReleases by viewModel.newReleases.collectAsStateWithLifecycle()
+    val upcomingGames by viewModel.upcomingGames.collectAsStateWithLifecycle()
     val topRatedGames by viewModel.topRatedGames.collectAsStateWithLifecycle()
     val isLoadingApi by viewModel.isLoadingApi.collectAsStateWithLifecycle()
 
@@ -295,14 +299,17 @@ fun AfterGameApp(
     val isAddDialogOpen by viewModel.isAddGameDialogOpen.collectAsStateWithLifecycle()
     val selectedReviewForComments by viewModel.selectedReviewForComments.collectAsStateWithLifecycle()
     val activeComments by viewModel.activeComments.collectAsStateWithLifecycle()
+    var radialMenuGame by remember { mutableStateOf<GameItem?>(null) }
+    val context = LocalContext.current
 
     val isSignedIn = currentUser != null
 
     BackHandler(
-        enabled = selectedReviewForComments != null || selectedDetailGame != null ||
+        enabled = radialMenuGame != null || selectedReviewForComments != null || selectedDetailGame != null ||
             selectedReviewGame != null || isAddDialogOpen || activeTab != NavigationTab.HOME
     ) {
         when {
+            radialMenuGame != null -> radialMenuGame = null
             selectedReviewForComments != null -> viewModel.closeComments()
             selectedReviewGame != null -> viewModel.closeReviewDialog()
             selectedDetailGame != null -> viewModel.closeGameDetail()
@@ -319,9 +326,10 @@ fun AfterGameApp(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             NavigationBar(
-                containerColor = DarkSurface,
+                containerColor = DarkBackground,
                 tonalElevation = 8.dp,
                 modifier = Modifier
+                    .border(androidx.compose.foundation.BorderStroke(0.75.dp, BorderSubtle))
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .testTag("main_bottom_nav")
             ) {
@@ -496,8 +504,10 @@ fun AfterGameApp(
                             },
                             onRequireAuth = onRequireAuth,
                             onOpenListsTab = { viewModel.setActiveTab(NavigationTab.LISTS) },
+                            onPosterLongClick = { radialMenuGame = it },
                             popularGames = popularGames,
                             newReleases = newReleases,
+                            upcomingGames = upcomingGames,
                             topRatedGames = topRatedGames,
                             isLoadingApi = isLoadingApi
                         )
@@ -517,6 +527,7 @@ fun AfterGameApp(
                             onAddNewGameClick = {
                                 if (isSignedIn) viewModel.setAddGameDialogOpen(true) else onRequireAuth()
                             },
+                            onPosterLongClick = { radialMenuGame = it },
                             isSearchingRawg = isSearchingRawg || isLoadingApi
                         )
                     }
@@ -568,17 +579,50 @@ fun AfterGameApp(
     }
 
     selectedDetailGame?.let { game ->
-        GameDetailSheet(
+        androidx.compose.animation.AnimatedVisibility(
+            visible = true,
+            enter = androidx.compose.animation.slideInHorizontally(
+                initialOffsetX = { it },
+                animationSpec = androidx.compose.animation.core.tween(320)
+            ) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutHorizontally(
+                targetOffsetX = { it },
+                animationSpec = androidx.compose.animation.core.tween(280)
+            ) + androidx.compose.animation.fadeOut()
+        ) {
+            GameDetailScreen(
+                game = game,
+                allGames = exploreGames,
+                onDismiss = { viewModel.closeGameDetail() },
+                onOpenReview = {
+                    if (isSignedIn) viewModel.openReviewDialog(game) else onRequireAuth()
+                },
+                onToggleFavorite = {
+                    if (isSignedIn) viewModel.toggleFavorite(game) else onRequireAuth()
+                },
+                onPosterLongClick = { radialMenuGame = it }
+            )
+        }
+    }
+
+    radialMenuGame?.let { game ->
+        RadialGameActionMenu(
             game = game,
-            onDismiss = { viewModel.closeGameDetail() },
+            onDismiss = { radialMenuGame = null },
+            onStatusSelected = { status ->
+                if (isSignedIn) {
+                    viewModel.updateGameStatus(game, status)
+                    Toast.makeText(context, "تم تحديث حالة اللعبة!", Toast.LENGTH_SHORT).show()
+                } else {
+                    onRequireAuth()
+                }
+            },
             onOpenReview = {
-                if (isSignedIn) viewModel.openReviewDialog(game) else onRequireAuth()
-            },
-            onToggleFavorite = {
-                if (isSignedIn) viewModel.toggleFavorite(game) else onRequireAuth()
-            },
-            onDeleteGame = {
-                if (isSignedIn) viewModel.deleteGame(game) else onRequireAuth()
+                if (isSignedIn) {
+                    viewModel.openReviewDialog(game)
+                } else {
+                    onRequireAuth()
+                }
             }
         )
     }

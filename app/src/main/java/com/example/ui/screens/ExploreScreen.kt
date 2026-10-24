@@ -68,6 +68,7 @@ import com.example.ui.components.StarRatingDisplay
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
+import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.DarkSurfaceVariant
@@ -86,6 +87,7 @@ fun ExploreScreen(
     onGameClick: (GameItem) -> Unit,
     onReviewClick: (GameItem) -> Unit,
     onAddNewGameClick: () -> Unit,
+    onPosterLongClick: (GameItem) -> Unit = {},
     isSearchingRawg: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -108,9 +110,9 @@ fun ExploreScreen(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        DarkSurface,
-                        DarkSurface,
-                        DarkSurfaceVariant.copy(alpha = 0.88f)
+                        DarkBackground,
+                        DarkBackground,
+                        Color(0xFF070A12)
                     )
                 )
             ),
@@ -322,7 +324,8 @@ fun ExploreScreen(
                             FeaturedGameCard(
                                 game = game,
                                 onClick = { onGameClick(game) },
-                                onReviewClick = { onReviewClick(game) }
+                                onReviewClick = { onReviewClick(game) },
+                                onPosterLongClick = { onPosterLongClick(game) }
                             )
                         }
                     }
@@ -338,17 +341,75 @@ fun ExploreScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val headerTitle = if (searchQuery.isNotBlank()) {
+                    "نتائج البحث عن \"$searchQuery\" (${games.size})"
+                } else if (selectedGenre != "All" && selectedGenre != "الكل") {
+                    "ألعاب تصنيف $selectedGenre (${games.size})"
+                } else {
+                    "جميع الألعاب (${games.size})"
+                }
                 Text(
-                    text = "جميع الألعاب (${games.size})",
+                    text = headerTitle,
                     color = TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "انقر للتفاصيل أو التقييم",
-                    color = TextMuted,
+                    text = if (isSearchingRawg) "جاري البحث المباشر..." else "انقر للتفاصيل أو التقييم",
+                    color = if (isSearchingRawg) CyberSecondary else TextMuted,
                     fontSize = 11.sp
                 )
+            }
+        }
+
+        if (games.isEmpty() && !isSearchingRawg) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (searchQuery.isNotBlank()) "لم نجد نتائج لـ \"$searchQuery\"" else "لا توجد ألعاب متوفرة",
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "جرب البحث بالاسم الإنجليزي أو العربي، مثل:",
+                        color = TextMuted,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("God of War", "GTA", "Elden Ring", "Cyberpunk").forEach { suggestion ->
+                            Surface(
+                                color = DarkSurfaceElevated,
+                                shape = RoundedCornerShape(20.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.5f)),
+                                modifier = Modifier.clickable { onSearchQueryChange(suggestion) }
+                            ) {
+                                Text(
+                                    text = suggestion,
+                                    color = CyberPrimary,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -356,7 +417,8 @@ fun ExploreScreen(
             ExploreGameRowCard(
                 game = game,
                 onClick = { onGameClick(game) },
-                onReviewClick = { onReviewClick(game) }
+                onReviewClick = { onReviewClick(game) },
+                onPosterLongClick = { onPosterLongClick(game) }
             )
         }
     }
@@ -367,6 +429,7 @@ fun FeaturedGameCard(
     game: GameItem,
     onClick: () -> Unit,
     onReviewClick: () -> Unit,
+    onPosterLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -415,7 +478,9 @@ fun FeaturedGameCard(
                 GamePosterThumbnail(
                     game = game,
                     height = 120.dp,
-                    width = 186.dp
+                    width = 186.dp,
+                    onClick = onClick,
+                    onLongClick = onPosterLongClick
                 )
             }
 
@@ -483,6 +548,7 @@ fun ExploreGameRowCard(
     game: GameItem,
     onClick: () -> Unit,
     onReviewClick: () -> Unit,
+    onPosterLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -520,7 +586,9 @@ fun ExploreGameRowCard(
             GamePosterThumbnail(
                 game = game,
                 height = 88.dp,
-                width = 66.dp
+                width = 66.dp,
+                onClick = onClick,
+                onLongClick = onPosterLongClick
             )
 
             Spacer(modifier = Modifier.width(12.dp))

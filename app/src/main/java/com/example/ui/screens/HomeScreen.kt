@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -101,8 +103,10 @@ fun HomeScreen(
     onOpenComments: (FirebaseReview) -> Unit,
     onRequireAuth: () -> Unit,
     onOpenListsTab: () -> Unit,
+    onPosterLongClick: (GameItem) -> Unit = {},
     popularGames: List<GameItem> = emptyList(),
     newReleases: List<GameItem> = emptyList(),
+    upcomingGames: List<GameItem> = emptyList(),
     topRatedGames: List<GameItem> = emptyList(),
     isLoadingApi: Boolean = false,
     modifier: Modifier = Modifier
@@ -270,11 +274,13 @@ fun HomeScreen(
                         games = games,
                         popularGames = popularGames,
                         newReleases = newReleases,
+                        upcomingGames = upcomingGames,
                         topRatedGames = topRatedGames,
                         isLoadingApi = isLoadingApi,
                         currentUser = currentUser,
                         onGameClick = onGameClick,
-                        onRequireAuth = onRequireAuth
+                        onRequireAuth = onRequireAuth,
+                        onPosterLongClick = onPosterLongClick
                     )
                 }
                 HomeSubTab.REVIEWS -> {
@@ -316,15 +322,18 @@ private fun GamesHomeContent(
     games: List<GameItem>,
     popularGames: List<GameItem>,
     newReleases: List<GameItem>,
+    upcomingGames: List<GameItem>,
     topRatedGames: List<GameItem>,
     isLoadingApi: Boolean,
     currentUser: FirebaseUser?,
     onGameClick: (GameItem) -> Unit,
-    onRequireAuth: () -> Unit
+    onRequireAuth: () -> Unit,
+    onPosterLongClick: (GameItem) -> Unit = {}
 ) {
-    val displayReleases = if (newReleases.isNotEmpty()) newReleases else games.take(8)
-    val displayPopular = if (popularGames.isNotEmpty()) popularGames else games.drop(4).take(8)
-    val displayMasterpieces = if (topRatedGames.isNotEmpty()) topRatedGames else games.take(6)
+    val displayReleases = if (newReleases.isNotEmpty()) newReleases else games.take(10)
+    val displayUpcoming = if (upcomingGames.isNotEmpty()) upcomingGames else games.filter { it.releaseYear >= 2025 }.take(10)
+    val displayPopular = if (popularGames.isNotEmpty()) popularGames else games
+    val popularChunks = remember(displayPopular) { displayPopular.chunked(3) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -409,7 +418,7 @@ private fun GamesHomeContent(
             }
         }
 
-        // Section: New Releases (Horizontal carousel as in video 00:01)
+        // Section 1: New Releases (Horizontal carousel of newly released games)
         item {
             Row(
                 modifier = Modifier
@@ -440,6 +449,7 @@ private fun GamesHomeContent(
                     GameReleaseCard(
                         game = game,
                         onClick = { onGameClick(game) },
+                        onLongClick = { onPosterLongClick(game) },
                         onRequireAuth = onRequireAuth,
                         badgeText = "${game.releaseYear}"
                     )
@@ -447,7 +457,7 @@ private fun GamesHomeContent(
             }
         }
 
-        // Section: Upcoming Games / Highly Anticipated (as in video 00:02)
+        // Section 2: Upcoming Games (Horizontal carousel with Soon badge)
         item {
             Spacer(modifier = Modifier.height(16.dp))
             Row(
@@ -458,7 +468,7 @@ private fun GamesHomeContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Popular Trending Games",
+                    text = "Upcoming Games",
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -475,129 +485,237 @@ private fun GamesHomeContent(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(displayPopular) { game ->
+                items(displayUpcoming) { game ->
                     GameReleaseCard(
                         game = game,
                         onClick = { onGameClick(game) },
+                        onLongClick = { onPosterLongClick(game) },
                         onRequireAuth = onRequireAuth,
-                        badgeText = if (game.releaseYear >= 2024) "${game.releaseYear}" else "Popular"
+                        badgeText = "Soon"
                     )
                 }
             }
         }
 
-        // Section: Top Grounded Masterpieces
+        // Section 3: Popular Games (Featured 3-column poster grid)
         item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Community Masterpieces",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
-            )
-        }
-
-        items(displayMasterpieces) { game ->
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+            Spacer(modifier = Modifier.height(18.dp))
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .clickable { onGameClick(game) }
+                    .padding(horizontal = 18.dp, vertical = 6.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = game.coverUrl,
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    )
+                Text(
+                    text = "Popular Games",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Explore curated titles with complete verified ratings",
+                    color = TextMuted,
+                    fontSize = 12.sp
+                )
+            }
+        }
 
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = game.title,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+        items(popularChunks) { rowGames ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                for (game in rowGames) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        GamePosterGridCard(
+                            game = game,
+                            onClick = { onGameClick(game) },
+                            onLongClick = { onPosterLongClick(game) }
                         )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "${game.developer} • ${game.genres}",
-                            color = TextMuted,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = GoldStar,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "%.1f".format(game.communityRating),
-                                color = GoldStar,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "${game.releaseYear}",
-                                color = CyberPrimary,
-                                fontSize = 11.sp
-                            )
-                        }
                     }
+                }
+                for (i in 0 until (3 - rowGames.size)) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun GamePosterGridCard(
+    game: GameItem,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
+) {
+    val gradientColors = com.example.ui.components.parseGradient(game.gradientColors)
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(165.dp)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(gradientColors))
+        ) {
+            if (game.coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(context)
+                        .data(game.coverUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = game.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.SportsEsports,
+                            contentDescription = null,
+                            tint = CyberPrimary.copy(alpha = 0.8f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = game.title,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // Dark gradient overlay for bottom text legibility
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f), Color.Black)
+                        )
+                    )
+            )
+
+            // Top-right release year chip
+            Surface(
+                color = Color.Black.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+            ) {
+                Text(
+                    text = "${game.releaseYear}",
+                    color = TextSecondary,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+
+            // Bottom title and score
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = game.title,
+                    color = TextPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = GoldStar,
+                        modifier = Modifier.size(11.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "%.1f".format(game.communityRating),
+                        color = GoldStar,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun GameReleaseCard(
     game: GameItem,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     onRequireAuth: () -> Unit,
     badgeText: String
 ) {
+    val gradientColors = com.example.ui.components.parseGradient(game.gradientColors)
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
         modifier = Modifier
             .width(150.dp)
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
+                    .background(Brush.verticalGradient(gradientColors))
             ) {
-                AsyncImage(
-                    model = game.coverUrl,
-                    contentDescription = game.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (game.coverUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = coil.request.ImageRequest.Builder(context)
+                            .data(game.coverUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = game.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 // Year / Soon Badge top-left
                 Surface(

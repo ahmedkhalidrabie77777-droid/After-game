@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -222,14 +223,25 @@ fun PlatformTag(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun GamePosterThumbnail(
     game: GameItem,
     modifier: Modifier = Modifier,
     height: Dp = 130.dp,
-    width: Dp = 95.dp
+    width: Dp = 95.dp,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null
 ) {
     val gradientColors = parseGradient(game.gradientColors)
+    val clickModifier = if (onClick != null || onLongClick != null) {
+        Modifier.combinedClickable(
+            onClick = { onClick?.invoke() },
+            onLongClick = { onLongClick?.invoke() }
+        )
+    } else {
+        Modifier
+    }
 
     Box(
         modifier = modifier
@@ -238,45 +250,44 @@ fun GamePosterThumbnail(
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
             .background(Brush.verticalGradient(gradientColors))
+            .then(clickModifier)
     ) {
         if (game.coverUrl.isNotBlank()) {
             AsyncImage(
-                model = game.coverUrl,
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(game.coverUrl)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = game.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
             )
-            // dark gradient overlay
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                        )
-                    )
-            )
         }
 
-        // Title initial watermark if no image or overlay
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(6.dp)
-        ) {
-            Text(
-                text = game.title,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = game.releaseYear.toString(),
-                color = TextSecondary,
-                fontSize = 10.sp
-            )
+        // Title initial watermark only if no cover image is available
+        if (game.coverUrl.isBlank()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = game.title,
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = game.releaseYear.toString(),
+                    color = TextSecondary,
+                    fontSize = 10.sp
+                )
+            }
         }
 
         // Rating pill in top right corner if rated

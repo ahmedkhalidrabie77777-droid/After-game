@@ -126,6 +126,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _apiPopularGamesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
     private val _apiTopRatedGamesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
     private val _apiNewReleasesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
+    private val _apiUpcomingGamesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
     private val _apiExploreGamesRaw = MutableStateFlow<List<RawgGameDto>>(emptyList())
 
     private val _isLoadingApi = MutableStateFlow(false)
@@ -142,25 +143,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val activeComments: StateFlow<List<FirebaseComment>> = _activeComments.asStateFlow()
 
     private fun mapDtoToGameItem(dto: RawgGameDto, localMap: Map<Long, GameItem>): GameItem {
-        val existing = localMap[dto.id] ?: localMap.values.find { it.title.equals(dto.name, ignoreCase = true) }
-        val platformNames = dto.platforms.mapNotNull { it.platform?.name }.take(4).joinToString(", ")
-            .ifBlank { "PC, PlayStation, Xbox" }
-        val genreNames = dto.genres.map { it.name }.take(3).joinToString(", ")
-            .ifBlank { "Action" }
+        val gameName = dto.name?.ifBlank { null } ?: "Game #${dto.id}"
+        val existing = localMap[dto.id] ?: localMap.values.find { it.title.equals(gameName, ignoreCase = true) }
+        val platformNames = dto.platforms?.mapNotNull { it.platform?.name }?.take(4)?.joinToString(", ")
+            ?.ifBlank { "PC, PlayStation, Xbox" } ?: "PC, PlayStation, Xbox"
+        val genreNames = dto.genres?.mapNotNull { it.name }?.take(3)?.joinToString(", ")
+            ?.ifBlank { "Action" } ?: "Action"
         val releaseYearVal = dto.released?.take(4)?.toIntOrNull() ?: 2024
+        val rawRating = dto.rating ?: 0f
         val communityScore = if (dto.metacritic != null && dto.metacritic > 0) {
             (dto.metacritic / 20f).coerceIn(0.5f, 5.0f)
-        } else if (dto.rating > 0f) {
-            (dto.rating).coerceIn(0.5f, 5.0f)
+        } else if (rawRating > 0f) {
+            rawRating.coerceIn(0.5f, 5.0f)
         } else {
             4.5f
         }
+        val ratingsCnt = dto.ratingsCount ?: 0
         val desc = dto.descriptionRaw?.ifBlank { null }
-            ?: "بيانات حية من قاعدة ألعاب RAWG لـ ${dto.name} مع ${dto.ratingsCount} تقييم عالمي ومتوسط ${String.format("%.1f", communityScore)}/5."
+            ?: "بيانات حية من قاعدة ألعاب RAWG لـ $gameName مع $ratingsCnt تقييم عالمي ومتوسط ${String.format("%.1f", communityScore)}/5."
 
         return GameItem(
             id = dto.id,
-            title = dto.name,
+            title = gameName,
             titleAr = existing?.titleAr ?: "",
             developer = "RAWG Database",
             releaseYear = releaseYearVal,
@@ -222,14 +226,59 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Explore Screen games (Live from RAWG API based on search/genre, merged with local ratings)
-    val exploreGames: StateFlow<List<GameItem>> = combine(
-        _apiExploreGamesRaw,
+    val upcomingGames: StateFlow<List<GameItem>> = combine(
+        _apiUpcomingGamesRaw,
         rawGames
     ) { apiList, localList ->
         val localMap = localList.associateBy { it.id }
         if (apiList.isNotEmpty()) {
             apiList.map { mapDtoToGameItem(it, localMap) }
+        } else {
+            val future = localList.filter { it.releaseYear >= 2025 }
+            if (future.isNotEmpty()) future else localList.reversed()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Explore Screen games (Live from RAWG API based on search/genre, merged with local catalog and ratings)
+    val exploreGames: StateFlow<List<GameItem>> = combine(
+        _apiExploreGamesRaw,
+        rawGames,
+        _searchQuery,
+        _selectedGenre
+    ) { apiList, localList, query, genre ->
+        val localMap = localList.associateBy { it.id }
+        val mappedApi = apiList.map { mapDtoToGameItem(it, localMap) }
+        
+        // Merge without duplicating games (prioritize local if user logged/rated, otherwise API)
+        val combined = (mappedApi + localList).distinctBy { it.title.lowercase().trim() }
+        
+        val q = query.trim()
+        val hasQuery = q.isNotEmpty()
+        val hasGenre = genre != "All" && genre != "الكل"
+
+        var filtered = combined
+
+        if (hasQuery) {
+            filtered = filtered.filter { game ->
+                game.title.contains(q, ignoreCase = true) ||
+                game.titleAr.contains(q, ignoreCase = true) ||
+                game.developer.contains(q, ignoreCase = true) ||
+                game.genres.contains(q, ignoreCase = true)
+            }
+        }
+
+        if (hasGenre) {
+            val genreClean = genre.lowercase().trim()
+            filtered = filtered.filter { game ->
+                game.genres.contains(genre, ignoreCase = true) ||
+                game.genres.lowercase().contains(genreClean)
+            }
+        }
+
+        if (filtered.isNotEmpty()) {
+            filtered
+        } else if (hasQuery || hasGenre) {
+            emptyList()
         } else {
             localList
         }
@@ -327,55 +376,94 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun fetchInitialApiGames() {
         viewModelScope.launch {
             _isLoadingApi.value = true
-            try {
-                // 1. Popular / Trending Games (TMDB-style trending)
-                val popResponse = withContext(Dispatchers.IO) {
-                    RawgApiClient.service.getGames(
-                        apiKey = RawgApiClient.apiKey,
-                        ordering = "-added",
-                        pageSize = 20
-                    )
-                }
-                if (popResponse.results.isNotEmpty()) {
-                    _apiPopularGamesRaw.value = popResponse.results
-                    if (_apiExploreGamesRaw.value.isEmpty()) {
-                        _apiExploreGamesRaw.value = popResponse.results
-                    }
-                    if (_compareGameA.value == null) {
-                        _compareGameA.value = mapDtoToGameItem(popResponse.results[0], emptyMap())
-                    }
-                    if (_compareGameB.value == null && popResponse.results.size > 1) {
-                        _compareGameB.value = mapDtoToGameItem(popResponse.results[1], emptyMap())
-                    }
-                }
 
-                // 2. Top-Rated Games of All Time
-                val topResponse = withContext(Dispatchers.IO) {
-                    RawgApiClient.service.getGames(
-                        apiKey = RawgApiClient.apiKey,
-                        ordering = "-metacritic",
-                        pageSize = 15
-                    )
+            // 1. Popular / Trending Games (Live from RAWG, 30 items for carousel + poster grid)
+            launch {
+                try {
+                    val popResponse = withContext(Dispatchers.IO) {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            ordering = "-added",
+                            pageSize = 30
+                        )
+                    }
+                    val validPop = popResponse.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
+                    if (validPop.isNotEmpty()) {
+                        _apiPopularGamesRaw.value = validPop
+                        if (_apiExploreGamesRaw.value.isEmpty()) {
+                            _apiExploreGamesRaw.value = validPop
+                        }
+                        if (_compareGameA.value == null) {
+                            _compareGameA.value = mapDtoToGameItem(validPop[0], emptyMap())
+                        }
+                        if (_compareGameB.value == null && validPop.size > 1) {
+                            _compareGameB.value = mapDtoToGameItem(validPop[1], emptyMap())
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "RAWG pop error: ${e.message}")
+                } finally {
+                    _isLoadingApi.value = false
                 }
-                if (topResponse.results.isNotEmpty()) {
-                    _apiTopRatedGamesRaw.value = topResponse.results
-                }
+            }
 
-                // 3. New Releases
-                val newResponse = withContext(Dispatchers.IO) {
-                    RawgApiClient.service.getGames(
-                        apiKey = RawgApiClient.apiKey,
-                        ordering = "-released",
-                        pageSize = 15
-                    )
+            // 2. Upcoming Games (Ordered by popularity with future release dates)
+            launch {
+                try {
+                    val upcomingResponse = withContext(Dispatchers.IO) {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            dates = "2025-01-01,2027-12-31",
+                            ordering = "-added",
+                            pageSize = 20
+                        )
+                    }
+                    val validUpcoming = upcomingResponse.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
+                    if (validUpcoming.isNotEmpty()) {
+                        _apiUpcomingGamesRaw.value = validUpcoming
+                    }
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "RAWG upcoming error: ${e.message}")
                 }
-                if (newResponse.results.isNotEmpty()) {
-                    _apiNewReleasesRaw.value = newResponse.results
+            }
+
+            // 3. New Releases (Ordered by -released so newly released games appear first automatically)
+            launch {
+                try {
+                    val newResponse = withContext(Dispatchers.IO) {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            dates = "2024-01-01,2026-12-31",
+                            ordering = "-released",
+                            pageSize = 20
+                        )
+                    }
+                    val validNew = newResponse.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
+                    if (validNew.isNotEmpty()) {
+                        _apiNewReleasesRaw.value = validNew
+                    }
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "RAWG new releases error: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.w("GameViewModel", "RAWG API fetch error: ${e.message}")
-            } finally {
-                _isLoadingApi.value = false
+            }
+
+            // 4. Top-Rated Games of All Time
+            launch {
+                try {
+                    val topResponse = withContext(Dispatchers.IO) {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            ordering = "-metacritic",
+                            pageSize = 15
+                        )
+                    }
+                    val validTop = topResponse.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
+                    if (validTop.isNotEmpty()) {
+                        _apiTopRatedGamesRaw.value = validTop
+                    }
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "RAWG top error: ${e.message}")
+                }
             }
         }
     }
@@ -432,8 +520,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 }
-                if (response.results.isNotEmpty()) {
-                    _apiExploreGamesRaw.value = response.results
+                val validGames = response.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
+                if (validGames.isNotEmpty()) {
+                    _apiExploreGamesRaw.value = validGames
                 }
             } catch (e: Exception) {
                 Log.w("GameViewModel", "RAWG genre error: ${e.message}")
@@ -443,11 +532,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var searchJob: kotlinx.coroutines.Job? = null
+
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
-        if (query.trim().length >= 2) {
-            searchRawgLive(query.trim())
-        } else if (query.isBlank()) {
+        searchJob?.cancel()
+        val q = query.trim()
+        if (q.length >= 2) {
+            searchJob = viewModelScope.launch {
+                kotlinx.coroutines.delay(350)
+                searchRawgLive(q)
+            }
+        } else if (q.isBlank()) {
             loadGamesByGenre(_selectedGenre.value)
         }
     }
@@ -463,8 +559,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         pageSize = 25
                     )
                 }
-                if (response.results.isNotEmpty()) {
-                    _apiExploreGamesRaw.value = response.results
+                val validGames = response.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
+                if (validGames.isNotEmpty()) {
+                    // Prepend new search results so they show up at top of explore list
+                    val current = _apiExploreGamesRaw.value
+                    _apiExploreGamesRaw.value = (validGames + current).distinctBy { it.id }
                 }
             } catch (e: Exception) {
                 Log.w("GameViewModel", "RAWG live search error: ${e.message}")
@@ -500,6 +599,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeGameDetail() {
         _selectedGameForDetail.value = null
+    }
+
+    fun updateGameStatus(game: GameItem, newStatus: String) {
+        viewModelScope.launch {
+            val updated = game.copy(
+                status = newStatus,
+                loggedDate = if (game.loggedDate > 0L) game.loggedDate else System.currentTimeMillis()
+            )
+            localRepository.insertGame(updated)
+            if (_selectedGameForDetail.value?.id == game.id) {
+                _selectedGameForDetail.value = updated
+            }
+        }
     }
 
     fun setAddGameDialogOpen(isOpen: Boolean) {
@@ -563,6 +675,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 ?: popularGames.value.find { it.id == gameId }
                 ?: topRatedGames.value.find { it.id == gameId }
                 ?: newReleases.value.find { it.id == gameId }
+                ?: upcomingGames.value.find { it.id == gameId }
                 ?: rawGames.value.find { it.id == gameId }
                 ?: return@launch
 
