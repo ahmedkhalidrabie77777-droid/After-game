@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [GameItem::class], version = 1, exportSchema = false)
+@Database(entities = [GameItem::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun gameDao(): GameDao
 
@@ -25,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "after_game_database"
                 )
+                .fallbackToDestructiveMigration()
                 .addCallback(DatabaseCallback(scope))
                 .build()
                 INSTANCE = instance
@@ -37,6 +38,15 @@ abstract class AppDatabase : RoomDatabase() {
         ) : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
+                INSTANCE?.let { database ->
+                    scope.launch(Dispatchers.IO) {
+                        populateInitialDatabase(database.gameDao())
+                    }
+                }
+            }
+
+            override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                super.onDestructiveMigration(db)
                 INSTANCE?.let { database ->
                     scope.launch(Dispatchers.IO) {
                         populateInitialDatabase(database.gameDao())

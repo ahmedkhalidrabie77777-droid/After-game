@@ -77,6 +77,7 @@ import com.example.ui.theme.GoldStar
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.util.AppLanguage
 import com.example.ui.viewmodel.GamerStats
 import com.google.firebase.auth.FirebaseUser
 
@@ -258,11 +259,12 @@ private fun GuestProfileView(
                 letterSpacing = 0.5.sp
             )
 
+            val isArabic = AppLanguage.isArabic
             Spacer(modifier = Modifier.height(6.dp))
 
             // Subtitle
             Text(
-                text = "Real, honest game ratings from everyday gamers",
+                text = if (isArabic) "تقييمات وتجارب حقيقية من مجتمع اللاعبين" else "Real, honest game ratings from everyday gamers",
                 color = TextSecondary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Normal,
@@ -307,7 +309,7 @@ private fun GuestProfileView(
 
             // Bottom Artwork text
             Text(
-                text = "Artwork from • After Game Community",
+                text = if (isArabic) "لوحة فنية من مجتمع • After Game" else "Artwork from • After Game Community",
                 color = TextMuted.copy(alpha = 0.7f),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium
@@ -606,19 +608,13 @@ private fun ProfileOptionCard(
 
                 Spacer(modifier = Modifier.width(14.dp))
 
-                Column {
-                    Text(
-                        text = label,
-                        color = TextPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = labelAr,
-                        color = TextMuted,
-                        fontSize = 11.sp
-                    )
-                }
+                val isArabic = AppLanguage.isArabic
+                Text(
+                    text = if (isArabic) labelAr else label,
+                    color = TextPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
 
             Icon(

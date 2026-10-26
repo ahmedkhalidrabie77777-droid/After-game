@@ -170,4 +170,64 @@ class FirestoreReviewRepository(private val db: FirebaseFirestore) {
             throw e
         }
     }
+
+    suspend fun logPlaytime(
+        gameId: Long,
+        gameTitle: String,
+        gameTitleAr: String,
+        hoursPlayed: Float,
+        currentStatus: String = "PLAYING",
+        currentRating: Float = 0f
+    ) {
+        val uid = requireUserId()
+        val author = auth.currentUser?.displayName?.ifBlank { "Gamer" } ?: "Gamer"
+        val photo = auth.currentUser?.photoUrl?.toString() ?: ""
+        val docId = "rev_${uid}_$gameId"
+        val docRef = db.collection("reviews").document(docId)
+
+        val validStatus = when (currentStatus) {
+            "PLAYING", "COMPLETED", "BACKLOG", "MASTERED", "DROPPED" -> currentStatus
+            else -> "PLAYING"
+        }
+
+        try {
+            val snapshot = docRef.get().await()
+            if (snapshot.exists()) {
+                val updates = hashMapOf<String, Any>(
+                    "hoursPlayed" to hoursPlayed.toDouble(),
+                    "status" to validStatus,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+                docRef.update(updates).await()
+            } else {
+                val payload = hashMapOf<String, Any>(
+                    "userId" to uid,
+                    "authorName" to author,
+                    "authorPhotoUrl" to photo,
+                    "gameId" to "game_$gameId",
+                    "gameTitle" to gameTitle.ifBlank { "Game" },
+                    "gameTitleAr" to gameTitleAr,
+                    "rating" to currentRating.toDouble().coerceIn(0.0, 5.0),
+                    "status" to validStatus,
+                    "hoursPlayed" to hoursPlayed.toDouble(),
+                    "reviewTitle" to "",
+                    "reviewBody" to "",
+                    "platformPlayed" to "PC",
+                    "pros" to "",
+                    "cons" to "",
+                    "subGameplayScore" to 0.0,
+                    "subStoryScore" to 0.0,
+                    "subVisualsScore" to 0.0,
+                    "subAudioScore" to 0.0,
+                    "likesCount" to 0L,
+                    "createdAt" to FieldValue.serverTimestamp()
+                )
+                docRef.set(payload).await()
+            }
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            throw e
+        }
+    }
 }
+

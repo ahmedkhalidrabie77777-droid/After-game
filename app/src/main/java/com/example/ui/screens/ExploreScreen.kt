@@ -76,6 +76,7 @@ import com.example.ui.theme.GoldStar
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.util.AppLanguage
 
 @Composable
 fun ExploreScreen(
@@ -89,6 +90,8 @@ fun ExploreScreen(
     onAddNewGameClick: () -> Unit,
     onPosterLongClick: (GameItem) -> Unit = {},
     isSearchingRawg: Boolean = false,
+    onLoadMore: () -> Unit = {},
+    isLoadingMore: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val genresList = listOf(
@@ -174,6 +177,7 @@ fun ExploreScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
+                                val isArabic = AppLanguage.isArabic
                                 Text(
                                     text = "AFTER GAME",
                                     color = Color.White,
@@ -182,7 +186,7 @@ fun ExploreScreen(
                                     letterSpacing = 1.8.sp
                                 )
                                 Text(
-                                    text = "سجل ومراجعات ألعاب الفيديو",
+                                    text = if (isArabic) "سجل ومراجعات ألعاب الفيديو" else "Video Game Diary & Reviews",
                                     color = CyberSecondary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium
@@ -190,6 +194,7 @@ fun ExploreScreen(
                             }
                         }
 
+                        val isArabic = AppLanguage.isArabic
                         Button(
                             onClick = onAddNewGameClick,
                             colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
@@ -205,7 +210,7 @@ fun ExploreScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "إضافة لعبة",
+                                text = if (isArabic) "إضافة لعبة" else "Add Game",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -217,11 +222,18 @@ fun ExploreScreen(
         }
 
         item {
+            val isArabic = AppLanguage.isArabic
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
-                    placeholder = { Text("ابحث عن لعبة، مطور، أو تصنيف...", color = TextMuted, fontSize = 13.sp) },
+                    placeholder = {
+                        Text(
+                            text = if (isArabic) "ابحث عن لعبة، مطور، أو تصنيف..." else "Search game, developer, or genre...",
+                            color = TextMuted,
+                            fontSize = 13.sp
+                        )
+                    },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
@@ -268,7 +280,7 @@ fun ExploreScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "جاري البحث في قاعدة بيانات RAWG العالمية...",
+                            text = if (isArabic) "جاري البحث في قاعدة بيانات RAWG العالمية..." else "Searching RAWG global games database...",
                             color = CyberSecondary,
                             fontSize = 11.sp
                         )
@@ -278,6 +290,7 @@ fun ExploreScreen(
         }
 
         item {
+            val isArabic = AppLanguage.isArabic
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -288,7 +301,7 @@ fun ExploreScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { onGenreSelect(genreKey) },
-                        label = { Text(genreLabel, fontSize = 12.sp) },
+                        label = { Text(if (isArabic) genreLabel else genreKey, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = CyberPrimary.copy(alpha = 0.9f),
                             selectedLabelColor = Color.White,
@@ -307,9 +320,10 @@ fun ExploreScreen(
 
         if (searchQuery.isBlank() && selectedGenre == "All" && featuredGames.isNotEmpty()) {
             item {
+                val isArabic = AppLanguage.isArabic
                 Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
                     Text(
-                        text = "أبرز الألعاب المرشحة للمراجعة",
+                        text = if (isArabic) "أبرز الألعاب المرشحة للمراجعة" else "Featured Games for Review",
                         color = TextPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
@@ -334,6 +348,7 @@ fun ExploreScreen(
         }
 
         item {
+            val isArabic = AppLanguage.isArabic
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -342,11 +357,11 @@ fun ExploreScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val headerTitle = if (searchQuery.isNotBlank()) {
-                    "نتائج البحث عن \"$searchQuery\" (${games.size})"
+                    if (isArabic) "نتائج البحث عن \"$searchQuery\" (${games.size})" else "Search results for \"$searchQuery\" (${games.size})"
                 } else if (selectedGenre != "All" && selectedGenre != "الكل") {
-                    "ألعاب تصنيف $selectedGenre (${games.size})"
+                    if (isArabic) "ألعاب تصنيف $selectedGenre (${games.size})" else "Games in $selectedGenre (${games.size})"
                 } else {
-                    "جميع الألعاب (${games.size})"
+                    if (isArabic) "جميع الألعاب (${games.size})" else "All Games (${games.size})"
                 }
                 Text(
                     text = headerTitle,
@@ -355,7 +370,11 @@ fun ExploreScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (isSearchingRawg) "جاري البحث المباشر..." else "انقر للتفاصيل أو التقييم",
+                    text = if (isSearchingRawg) {
+                        if (isArabic) "جاري البحث المباشر..." else "Searching live..."
+                    } else {
+                        if (isArabic) "انقر للتفاصيل أو التقييم" else "Tap for details or rating"
+                    },
                     color = if (isSearchingRawg) CyberSecondary else TextMuted,
                     fontSize = 11.sp
                 )
@@ -420,6 +439,65 @@ fun ExploreScreen(
                 onReviewClick = { onReviewClick(game) },
                 onPosterLongClick = { onPosterLongClick(game) }
             )
+        }
+
+        if (games.isNotEmpty()) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Surface(
+                        color = DarkSurface,
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isLoadingMore) { onLoadMore() }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 14.dp, horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (isLoadingMore) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    color = CyberPrimary,
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                val isArabic = AppLanguage.isArabic
+                                Text(
+                                    text = if (isArabic) "جاري تحميل 40 لعبة إضافية من قاعدة البيانات..." else "Loading 40 more games from database...",
+                                    color = CyberSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else {
+                                val isArabic = AppLanguage.isArabic
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = null,
+                                    tint = CyberPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isArabic) "تحميل المزيد من الألعاب (قاعدة بيانات تضم 900K لعبة)" else "Load More Games (900K+ Games)",
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

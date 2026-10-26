@@ -15,10 +15,12 @@ interface RawgApiService {
     @GET("games")
     suspend fun getGames(
         @Query("key") apiKey: String,
-        @Query("page_size") pageSize: Int = 20,
+        @Query("page_size") pageSize: Int = 40,
         @Query("search") search: String? = null,
+        @Query("search_precise") searchPrecise: Boolean? = null,
+        @Query("search_exact") searchExact: Boolean? = null,
         @Query("genres") genres: String? = null,
-        @Query("ordering") ordering: String? = "-added",
+        @Query("ordering") ordering: String? = null,
         @Query("dates") dates: String? = null,
         @Query("page") page: Int = 1
     ): RawgGamesResponse

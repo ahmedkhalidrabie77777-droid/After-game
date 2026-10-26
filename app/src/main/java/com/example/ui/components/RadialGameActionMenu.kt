@@ -13,8 +13,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -59,6 +57,7 @@ import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.TextPrimary
+import com.example.ui.util.AppLanguage
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -66,6 +65,7 @@ import kotlin.math.sin
 data class RadialActionItem(
     val id: String,
     val titleAr: String,
+    val titleEn: String,
     val icon: ImageVector,
     val targetStatus: String? = null,
     val isReviewAction: Boolean = false
@@ -78,6 +78,7 @@ fun RadialGameActionMenu(
     onStatusSelected: (String) -> Unit,
     onOpenReview: () -> Unit
 ) {
+    val isArabic = AppLanguage.isArabic
     var isExpanded by remember { mutableStateOf(false) }
     var activeHoveredTitle by remember { mutableStateOf<String?>(null) }
 
@@ -87,11 +88,11 @@ fun RadialGameActionMenu(
 
     val actions = remember {
         listOf(
-            RadialActionItem("playing", "ألعبها حالياً", Icons.Filled.SportsEsports, targetStatus = "PLAYING"),
-            RadialActionItem("completed", "تم اللعب", Icons.Filled.Check, targetStatus = "COMPLETED"),
-            RadialActionItem("wishlist", "قائمة الأمنيات", Icons.Filled.Favorite, targetStatus = "BACKLOG"),
-            RadialActionItem("dropped", "غير مكتملة", Icons.Filled.Close, targetStatus = "DROPPED"),
-            RadialActionItem("review", "كتابة مراجعة", Icons.Filled.Edit, isReviewAction = true)
+            RadialActionItem("playing", "ألعبها حالياً", "Playing", Icons.Filled.SportsEsports, targetStatus = "PLAYING"),
+            RadialActionItem("completed", "تم اللعب", "Completed", Icons.Filled.Check, targetStatus = "COMPLETED"),
+            RadialActionItem("wishlist", "قائمة الأمنيات", "Wishlist", Icons.Filled.Favorite, targetStatus = "BACKLOG"),
+            RadialActionItem("dropped", "غير مكتملة", "Dropped", Icons.Filled.Close, targetStatus = "DROPPED"),
+            RadialActionItem("review", "كتابة مراجعة", "Write Review", Icons.Filled.Edit, isReviewAction = true)
         )
     }
 
@@ -114,7 +115,7 @@ fun RadialGameActionMenu(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.82f))
+                .background(Color.Black.copy(alpha = 0.85f))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -129,62 +130,45 @@ fun RadialGameActionMenu(
                     .height(190.dp)
                     .shadow(16.dp, RoundedCornerShape(16.dp), spotColor = CyberPrimary)
                     .clip(RoundedCornerShape(16.dp))
-                    .border(1.5.dp, CyberPrimary.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                    .border(1.5.dp, CyberPrimary.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
                     .background(
                         Brush.verticalGradient(
                             listOf(DarkSurface, DarkBackground)
                         )
                     )
             ) {
-                if (game.coverUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = game.coverUrl,
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = game.title,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
+                CyberPosterImage(
+                    imageUrl = game.coverUrl,
+                    contentDescription = game.title,
+                    fallbackText = if (isArabic && game.titleAr.isNotBlank()) game.titleAr else game.title,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
-            // Radial Fan-Out Buttons around the poster (positioned on the left arc matching Video 1)
-            // In Video 1, the 5 buttons are arranged in an arc to the left/around the poster:
-            // angles from ~ 110 degrees down to 250 degrees (or around center-left)
-            val baseRadiusDp = 130f * animProgress
+            // Radial Fan-Out Buttons around the poster on the left arc
+            val baseRadiusDp = 120f * animProgress
             val angles = listOf(
                 110.0, // Top-Left: Controller
                 145.0, // Mid-Upper-Left: Checkmark
                 180.0, // Directly Left: Heart
                 215.0, // Mid-Lower-Left: Close X
-                250.0  // Bottom-Left: Edit Review
+                245.0  // Bottom-Left: Edit Review
             )
 
             actions.forEachIndexed { index, action ->
                 val angleDeg = angles.getOrElse(index) { 180.0 }
                 val angleRad = Math.toRadians(angleDeg)
-                // In Compose coordinate system: x = cos(angle), y = -sin(angle)
                 val offsetX = (cos(angleRad) * baseRadiusDp).roundToInt()
                 val offsetY = (-sin(angleRad) * baseRadiusDp).roundToInt()
 
-                val isSelectedOrHovered = activeHoveredTitle == action.titleAr
+                val actionLabel = if (isArabic) action.titleAr else action.titleEn
+                val isSelectedOrHovered = activeHoveredTitle == actionLabel
 
                 Box(
                     modifier = Modifier
                         .offset { IntOffset(offsetX.dp.roundToPx(), offsetY.dp.roundToPx()) }
-                        .size(54.dp)
+                        .size(52.dp)
                         .shadow(8.dp, CircleShape, spotColor = CyberPrimary)
                         .clip(CircleShape)
                         .background(
@@ -192,11 +176,11 @@ fun RadialGameActionMenu(
                         )
                         .border(
                             1.dp,
-                            if (isSelectedOrHovered) Color.White else CyberPrimary.copy(alpha = 0.5f),
+                            if (isSelectedOrHovered) Color.White else CyberPrimary.copy(alpha = 0.6f),
                             CircleShape
                         )
                         .clickable {
-                            activeHoveredTitle = action.titleAr
+                            activeHoveredTitle = actionLabel
                             if (action.isReviewAction) {
                                 onDismiss()
                                 onOpenReview()
@@ -212,34 +196,35 @@ fun RadialGameActionMenu(
                 ) {
                     Icon(
                         imageVector = action.icon,
-                        contentDescription = action.titleAr,
+                        contentDescription = actionLabel,
                         tint = if (isSelectedOrHovered) Color.White else CyberPrimary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            // Floating Tooltip Pill (matching Video 1 bottom tooltip "ألعبها حالياً", "تم اللعب", etc.)
+            // Floating Tooltip Pill - Positioned safely below all buttons to prevent any text overlapping
+            val defaultTooltip = if (isArabic) "اختر إجراء سريع للعبة" else "Choose quick action"
             AnimatedVisibility(
                 visible = activeHoveredTitle != null || isExpanded,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut(),
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .offset(y = 145.dp)
+                    .offset(y = 175.dp) // Pushed well below button 5
             ) {
                 Surface(
                     color = DarkSurface,
                     shape = RoundedCornerShape(20.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.5f)),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.6f)),
+                    shadowElevation = 8.dp
                 ) {
                     Text(
-                        text = activeHoveredTitle ?: "اختر إجراء سريع للعبة",
+                        text = activeHoveredTitle ?: defaultTooltip,
                         color = Color.White,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp)
                     )
                 }
             }

@@ -162,6 +162,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val desc = dto.descriptionRaw?.ifBlank { null }
             ?: "بيانات حية من قاعدة ألعاب RAWG لـ $gameName مع $ratingsCnt تقييم عالمي ومتوسط ${String.format("%.1f", communityScore)}/5."
 
+        val resolvedCover = when {
+            !dto.backgroundImage.isNullOrBlank() -> com.example.data.remote.GameSearchHelper.optimizePosterUrl(dto.backgroundImage)
+            !dto.shortScreenshots.isNullOrEmpty() && !dto.shortScreenshots[0].image.isNullOrBlank() -> com.example.data.remote.GameSearchHelper.optimizePosterUrl(dto.shortScreenshots[0].image!!)
+            existing?.coverUrl?.isNotBlank() == true -> existing.coverUrl
+            else -> com.example.data.remote.GameSearchHelper.getFallbackPosterForGame(gameName, genreNames)
+        }
+
         return GameItem(
             id = dto.id,
             title = gameName,
@@ -170,7 +177,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             releaseYear = releaseYearVal,
             platforms = platformNames,
             genres = genreNames,
-            coverUrl = dto.backgroundImage ?: existing?.coverUrl ?: "",
+            coverUrl = resolvedCover,
             synopsis = desc,
             communityRating = communityScore,
             userRating = existing?.userRating ?: 0f,
@@ -239,7 +246,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Explore Screen games (Live from RAWG API based on search/genre, merged with local catalog and ratings)
     val exploreGames: StateFlow<List<GameItem>> = combine(
         _apiExploreGamesRaw,
         rawGames,
@@ -248,39 +254,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     ) { apiList, localList, query, genre ->
         val localMap = localList.associateBy { it.id }
         val mappedApi = apiList.map { mapDtoToGameItem(it, localMap) }
-        
-        // Merge without duplicating games (prioritize local if user logged/rated, otherwise API)
-        val combined = (mappedApi + localList).distinctBy { it.title.lowercase().trim() }
-        
         val q = query.trim()
-        val hasQuery = q.isNotEmpty()
-        val hasGenre = genre != "All" && genre != "الكل"
 
-        var filtered = combined
-
-        if (hasQuery) {
-            filtered = filtered.filter { game ->
-                game.title.contains(q, ignoreCase = true) ||
-                game.titleAr.contains(q, ignoreCase = true) ||
-                game.developer.contains(q, ignoreCase = true) ||
-                game.genres.contains(q, ignoreCase = true)
+        if (q.isNotEmpty()) {
+            val matchingLocal = localList.filter {
+                it.title.contains(q, ignoreCase = true) ||
+                it.titleAr.contains(q, ignoreCase = true) ||
+                it.developer.contains(q, ignoreCase = true) ||
+                it.genres.contains(q, ignoreCase = true)
             }
-        }
-
-        if (hasGenre) {
-            val genreClean = genre.lowercase().trim()
-            filtered = filtered.filter { game ->
-                game.genres.contains(genre, ignoreCase = true) ||
-                game.genres.lowercase().contains(genreClean)
-            }
-        }
-
-        if (filtered.isNotEmpty()) {
-            filtered
-        } else if (hasQuery || hasGenre) {
-            emptyList()
+            (matchingLocal + mappedApi).distinctBy { it.id }
         } else {
-            localList
+            val hasGenre = genre != "All" && genre != "الكل"
+            if (hasGenre) {
+                mappedApi.ifEmpty {
+                    localList.filter { it.genres.contains(genre, ignoreCase = true) }
+                }
+            } else {
+                (mappedApi + localList).distinctBy { it.id }
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -492,7 +484,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var currentExplorePage = 1
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
     private fun loadGamesByGenre(genre: String) {
+        currentExplorePage = 1
         viewModelScope.launch {
             _isLoadingApi.value = true
             try {
@@ -503,24 +500,27 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             apiKey = RawgApiClient.apiKey,
                             genres = slug,
                             ordering = "-added",
-                            pageSize = 25
+                            pageSize = 40,
+                            page = 1
                         )
                     } else if (genre != "All" && genre != "الكل") {
                         RawgApiClient.service.getGames(
                             apiKey = RawgApiClient.apiKey,
                             search = genre,
                             ordering = "-rating",
-                            pageSize = 25
+                            pageSize = 40,
+                            page = 1
                         )
                     } else {
                         RawgApiClient.service.getGames(
                             apiKey = RawgApiClient.apiKey,
                             ordering = "-added",
-                            pageSize = 25
+                            pageSize = 40,
+                            page = 1
                         )
                     }
                 }
-                val validGames = response.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
+                val validGames = response.results ?: emptyList()
                 if (validGames.isNotEmpty()) {
                     _apiExploreGamesRaw.value = validGames
                 }
@@ -538,37 +538,119 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _searchQuery.value = query
         searchJob?.cancel()
         val q = query.trim()
-        if (q.length >= 2) {
+        if (q.isNotEmpty()) {
             searchJob = viewModelScope.launch {
-                kotlinx.coroutines.delay(350)
+                kotlinx.coroutines.delay(220)
                 searchRawgLive(q)
             }
-        } else if (q.isBlank()) {
+        } else {
             loadGamesByGenre(_selectedGenre.value)
         }
     }
 
     private fun searchRawgLive(query: String) {
+        currentExplorePage = 1
         viewModelScope.launch {
             _isSearchingRawg.value = true
             try {
+                val resolved = com.example.data.remote.GameSearchHelper.resolveSearchQuery(query)
+                // Search RAWG without forcing ordering so RAWG returns relevance search results
                 val response = withContext(Dispatchers.IO) {
                     RawgApiClient.service.getGames(
                         apiKey = RawgApiClient.apiKey,
-                        search = query,
-                        pageSize = 25
+                        search = resolved,
+                        searchPrecise = true,
+                        pageSize = 40,
+                        page = 1
                     )
                 }
-                val validGames = response.results?.filter { !it.backgroundImage.isNullOrBlank() } ?: emptyList()
-                if (validGames.isNotEmpty()) {
-                    // Prepend new search results so they show up at top of explore list
-                    val current = _apiExploreGamesRaw.value
-                    _apiExploreGamesRaw.value = (validGames + current).distinctBy { it.id }
+                var validGames = response.results?.filter { !it.name.isNullOrBlank() } ?: emptyList()
+
+                // If precise search returned few results, query with general search to be comprehensive
+                if (validGames.size < 5) {
+                    val fallbackResp = withContext(Dispatchers.IO) {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            search = resolved,
+                            pageSize = 40,
+                            page = 1
+                        )
+                    }
+                    val extra = fallbackResp.results?.filter { !it.name.isNullOrBlank() } ?: emptyList()
+                    validGames = (validGames + extra).distinctBy { it.id }
                 }
+
+                // Intelligently rank matching games: popular franchise hits (e.g., Marvel's Spider-Man) at top
+                val sortedGames = validGames.sortedWith(
+                    compareByDescending<RawgGameDto> { dto ->
+                        val name = dto.name?.lowercase() ?: ""
+                        val resolvedLower = resolved.lowercase()
+                        when {
+                            name.equals(resolvedLower, ignoreCase = true) -> 1000
+                            name.startsWith(resolvedLower, ignoreCase = true) -> 500
+                            name.contains(resolvedLower, ignoreCase = true) -> 200
+                            else -> 50
+                        } + (if ((dto.ratingsCount ?: 0) > 500) 100 else 0) + (if ((dto.rating ?: 0f) >= 4.0f) 50 else 0)
+                    }.thenByDescending { it.ratingsCount ?: 0 }
+                     .thenByDescending { it.rating ?: 0f }
+                )
+
+                _apiExploreGamesRaw.value = sortedGames
             } catch (e: Exception) {
                 Log.w("GameViewModel", "RAWG live search error: ${e.message}")
             } finally {
                 _isSearchingRawg.value = false
+            }
+        }
+    }
+
+    fun loadMoreExploreGames() {
+        if (_isLoadingMore.value || _isLoadingApi.value) return
+        viewModelScope.launch {
+            _isLoadingMore.value = true
+            try {
+                val nextPage = currentExplorePage + 1
+                val q = _searchQuery.value.trim()
+                val genre = _selectedGenre.value
+                val slug = getRawgGenreSlug(genre)
+
+                val response = withContext(Dispatchers.IO) {
+                    if (q.isNotEmpty()) {
+                        val resolved = com.example.data.remote.GameSearchHelper.resolveSearchQuery(q)
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            search = resolved,
+                            searchPrecise = true,
+                            pageSize = 40,
+                            page = nextPage
+                        )
+                    } else if (slug != null) {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            genres = slug,
+                            ordering = "-added",
+                            pageSize = 40,
+                            page = nextPage
+                        )
+                    } else {
+                        RawgApiClient.service.getGames(
+                            apiKey = RawgApiClient.apiKey,
+                            ordering = "-added",
+                            pageSize = 40,
+                            page = nextPage
+                        )
+                    }
+                }
+                val newResults = response.results?.filter { !it.name.isNullOrBlank() } ?: emptyList()
+                if (newResults.isNotEmpty()) {
+                    currentExplorePage = nextPage
+                    val current = _apiExploreGamesRaw.value
+                    _apiExploreGamesRaw.value = (current + newResults).distinctBy { it.id }
+                }
+            } catch (e: Exception) {
+                Log.w("GameViewModel", "Load more games error: ${e.message}")
+            } finally {
+                _isLoadingMore.value = false
             }
         }
     }
@@ -613,6 +695,47 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    fun logPlaytime(gameId: Long, hours: Float) {
+        viewModelScope.launch {
+            val existing = _selectedGameForDetail.value?.takeIf { it.id == gameId }
+                ?: exploreGames.value.find { it.id == gameId }
+                ?: popularGames.value.find { it.id == gameId }
+                ?: topRatedGames.value.find { it.id == gameId }
+                ?: newReleases.value.find { it.id == gameId }
+                ?: upcomingGames.value.find { it.id == gameId }
+                ?: rawGames.value.find { it.id == gameId }
+                ?: return@launch
+
+            val newStatus = if (existing.status != "NONE" && existing.status.isNotBlank()) existing.status else "PLAYING"
+            val updated = existing.copy(
+                hoursPlayed = hours,
+                status = newStatus,
+                loggedDate = if (existing.loggedDate > 0L) existing.loggedDate else System.currentTimeMillis()
+            )
+
+            // 1. Update local Room database
+            localRepository.insertGame(updated)
+            if (_selectedGameForDetail.value?.id == gameId) {
+                _selectedGameForDetail.value = updated
+            }
+
+            // 2. Cloud Firestore sync
+            try {
+                firestoreRepository.logPlaytime(
+                    gameId = gameId,
+                    gameTitle = existing.title,
+                    gameTitleAr = existing.titleAr,
+                    hoursPlayed = hours,
+                    currentStatus = newStatus,
+                    currentRating = existing.userRating
+                )
+            } catch (e: Exception) {
+                Log.w("GameViewModel", "Playtime cloud sync error: ${e.message}")
+            }
+        }
+    }
+
 
     fun setAddGameDialogOpen(isOpen: Boolean) {
         _isAddGameDialogOpen.value = isOpen
@@ -755,13 +878,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         platformPlayed: String
     ) {
         viewModelScope.launch {
+            val trimmedTitle = title.trim()
+            val resolvedGenres = genres.trim().ifBlank { "Action" }
+            val fallbackCover = com.example.data.remote.GameSearchHelper.getFallbackPosterForGame(trimmedTitle, resolvedGenres)
+
             val newGame = GameItem(
-                title = title.trim(),
+                title = trimmedTitle,
                 titleAr = titleAr.trim(),
                 developer = developer.trim().ifBlank { "Independent" },
                 releaseYear = if (releaseYear in 1970..2030) releaseYear else 2024,
-                genres = genres.trim().ifBlank { "Action" },
+                genres = resolvedGenres,
                 platforms = platforms.trim().ifBlank { "PC, Console" },
+                coverUrl = fallbackCover,
                 synopsis = synopsis.trim().ifBlank { "لعبة مخصصة مسجلة في المكتبة." },
                 communityRating = 4.5f,
                 userRating = userRating,
@@ -772,6 +900,31 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 loggedDate = if (userRating > 0f || status != "NONE") System.currentTimeMillis() else 0L
             )
             val generatedId = localRepository.insertGame(newGame)
+
+            // Asynchronously query RAWG for exact title to retrieve official poster and synopsis
+            launch(Dispatchers.IO) {
+                try {
+                    val rawgResp = RawgApiClient.service.getGames(
+                        apiKey = RawgApiClient.apiKey,
+                        search = trimmedTitle,
+                        searchPrecise = true,
+                        pageSize = 3
+                    )
+                    val match = rawgResp.results?.firstOrNull { !it.backgroundImage.isNullOrBlank() }
+                    if (match != null && !match.backgroundImage.isNullOrBlank()) {
+                        val updated = newGame.copy(
+                            id = generatedId,
+                            coverUrl = com.example.data.remote.GameSearchHelper.optimizePosterUrl(match.backgroundImage),
+                            developer = if (developer.isBlank() && !match.genres.isNullOrEmpty()) "RAWG Database" else newGame.developer,
+                            releaseYear = match.released?.take(4)?.toIntOrNull() ?: newGame.releaseYear,
+                            synopsis = if (synopsis.isBlank() && !match.descriptionRaw.isNullOrBlank()) match.descriptionRaw else newGame.synopsis
+                        )
+                        localRepository.updateGame(updated)
+                    }
+                } catch (e: Exception) {
+                    Log.w("GameViewModel", "RAWG metadata fetch on add failed: ${e.message}")
+                }
+            }
 
             // Also publish to community Firestore if reviewed
             if (userRating > 0f || userReview.isNotBlank()) {

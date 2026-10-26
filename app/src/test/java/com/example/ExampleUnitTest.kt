@@ -15,34 +15,45 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun testRawgApiDtoParsing() = kotlinx.coroutines.runBlocking {
-    val response = com.example.data.remote.RawgApiClient.service.getGames(
-      apiKey = com.example.data.remote.RawgApiClient.apiKey,
-      ordering = "-added",
-      pageSize = 5
-    )
-    assertNotNull(response.results)
-    assertTrue(response.results!!.isNotEmpty())
-    assertNotNull(response.results!![0].name)
-  }
-
-  @Test
-  fun testRawgSearchGod() = kotlinx.coroutines.runBlocking {
-    val response = com.example.data.remote.RawgApiClient.service.getGames(
-      apiKey = com.example.data.remote.RawgApiClient.apiKey,
-      search = "god",
-      pageSize = 10
-    )
-    println("RAWG search count: ${response.count}, results: ${response.results?.size}")
-    response.results?.forEach {
-      println("Game: ${it.name}, bg: ${it.backgroundImage}")
+  fun testRawgApiDtoParsing() {
+    kotlinx.coroutines.runBlocking {
+      val response = com.example.data.remote.RawgApiClient.service.getGames(
+        apiKey = com.example.data.remote.RawgApiClient.apiKey,
+        ordering = "-added",
+        pageSize = 5
+      )
+      assertNotNull(response.results)
+      assertTrue(response.results!!.isNotEmpty())
+      assertNotNull(response.results!![0].name)
     }
-    assertNotNull(response.results)
-    assertTrue(response.results!!.isNotEmpty())
   }
 
   @Test
-  fun testRawgEndpoints() = kotlinx.coroutines.runBlocking {
+  fun testRawgSearchSpider() {
+    kotlinx.coroutines.runBlocking {
+      val response = com.example.data.remote.RawgApiClient.service.getGames(
+        apiKey = com.example.data.remote.RawgApiClient.apiKey,
+        search = "spider",
+        searchPrecise = true,
+        pageSize = 20
+      )
+      assertNotNull(response.results)
+      assertTrue("Search results must not be empty", response.results!!.isNotEmpty())
+      val spiderGames = response.results!!.filter { it.name?.contains("spider", ignoreCase = true) == true }
+      assertTrue("Multiple games must contain spider in name", spiderGames.size >= 5)
+      println("Found ${spiderGames.size} spider games out of ${response.results!!.size}")
+
+      val optimized = com.example.data.remote.GameSearchHelper.optimizePosterUrl(
+        "https://media.rawg.io/media/games/20a/20aa03a10cda45239fe22d035c0ebe64.jpg"
+      )
+      assertTrue(optimized.contains("/crop/600/400/"))
+    }
+  }
+
+  @Test
+  fun testRawgEndpoints() {
+    kotlinx.coroutines.runBlocking {
+
     val pop = com.example.data.remote.RawgApiClient.service.getGames(
       apiKey = com.example.data.remote.RawgApiClient.apiKey,
       ordering = "-added",
@@ -74,5 +85,7 @@ class ExampleUnitTest {
     newRel.results?.forEach {
       println("${it.id}|${it.name}|${it.backgroundImage}")
     }
+    }
   }
 }
+

@@ -34,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -47,15 +48,22 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.input.KeyboardType
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,6 +86,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.GameItem
+import com.example.ui.components.CyberPosterImage
 import com.example.ui.components.parseGradient
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
@@ -125,7 +134,10 @@ fun GameDetailScreen(
     onDismiss: () -> Unit,
     onOpenReview: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onPosterLongClick: (GameItem) -> Unit = {}
+    onPosterLongClick: (GameItem) -> Unit = {},
+    isSignedIn: Boolean = false,
+    onRequireAuth: () -> Unit = {},
+    onLogPlaytime: (Long, Float) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     BackHandler { onDismiss() }
@@ -134,6 +146,16 @@ fun GameDetailScreen(
     var selectedSubTab by remember { mutableStateOf(DetailSubTab.DETAILS) }
     var isSynopsisExpanded by remember { mutableStateOf(false) }
     var isDetailsExpanded by remember { mutableStateOf(false) }
+
+    var playtimeInput by remember(game.hoursPlayed) {
+        mutableStateOf(
+            if (game.hoursPlayed > 0f) {
+                if (game.hoursPlayed % 1f == 0f) game.hoursPlayed.toInt().toString() else game.hoursPlayed.toString()
+            } else ""
+        )
+    }
+    var isPlaytimeSavedRecently by remember { mutableStateOf(false) }
+
 
     val gradientColors = remember(game.gradientColors) { parseGradient(game.gradientColors) }
 
@@ -178,17 +200,13 @@ fun GameDetailScreen(
                     .height(260.dp)
                     .background(Brush.verticalGradient(gradientColors))
             ) {
-                if (game.coverUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(game.coverUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                CyberPosterImage(
+                    imageUrl = game.coverUrl,
+                    contentDescription = game.title,
+                    contentScale = ContentScale.Crop,
+                    shape = androidx.compose.ui.graphics.RectangleShape,
+                    modifier = Modifier.fillMaxSize()
+                )
 
                 // Dark gradient overlay fading down to pure obsidian DarkBackground
                 Box(
@@ -323,7 +341,7 @@ fun GameDetailScreen(
                             shape = RoundedCornerShape(16.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                             modifier = Modifier.clickable {
-                                Toast.makeText(context, "تشغيل العرض الدعائي لـ ${game.title}", Toast.LENGTH_SHORT).show()
+                                com.example.data.remote.GameSearchHelper.launchGameTrailer(context, game.title)
                             }
                         ) {
                             Row(
@@ -351,7 +369,7 @@ fun GameDetailScreen(
                             shape = RoundedCornerShape(16.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                             modifier = Modifier.clickable {
-                                Toast.makeText(context, "استعراض طريقة اللعب (Gameplay)", Toast.LENGTH_SHORT).show()
+                                com.example.data.remote.GameSearchHelper.launchGameGameplay(context, game.title)
                             }
                         ) {
                             Row(
@@ -385,32 +403,14 @@ fun GameDetailScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .border(1.dp, CyberPrimary.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                         .background(Brush.verticalGradient(gradientColors))
-                        .clickable { onPosterLongClick(game) }
                 ) {
-                    if (game.coverUrl.isNotBlank()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(game.coverUrl)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = game.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = game.title,
-                                color = TextPrimary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
+                    CyberPosterImage(
+                        imageUrl = game.coverUrl,
+                        contentDescription = game.title,
+                        fallbackText = game.title,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
 
@@ -445,6 +445,227 @@ fun GameDetailScreen(
                 }
             }
 
+            // 3.5 Playtime Logger Card (ساعات اللعب وتحديث Firestore)
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (game.hoursPlayed > 0f) CyberPrimary.copy(alpha = 0.5f) else BorderSubtle
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp)
+                    .offset(y = (-24).dp)
+                    .testTag("playtime_logger_card")
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
+                    // Header row: Icon + Title + Logged Hours badge
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(CyberPrimary.copy(alpha = 0.15f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "ساعات اللعب",
+                                    tint = CyberPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "ساعات اللعب المنجزة",
+                                    color = TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "سجّل ساعات تجربتك ومزامنتها لحظياً في حسابك",
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        // Badge showing current recorded hours
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (game.hoursPlayed > 0f) CyberPrimary.copy(alpha = 0.18f) else DarkSurfaceElevated,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (game.hoursPlayed > 0f) CyberPrimary else BorderSubtle
+                            )
+                        ) {
+                            Text(
+                                text = if (game.hoursPlayed > 0f) {
+                                    val display = if (game.hoursPlayed % 1f == 0f) game.hoursPlayed.toInt().toString() else game.hoursPlayed.toString()
+                                    "$display س مسجلة"
+                                } else "0 س",
+                                color = if (game.hoursPlayed > 0f) CyberPrimary else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Input Field & Save Button Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = playtimeInput,
+                            onValueChange = { input ->
+                                playtimeInput = input.filter { it.isDigit() || it == '.' }
+                                isPlaytimeSavedRecently = false
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal
+                            ),
+                            placeholder = {
+                                Text("0", color = TextMuted, fontSize = 13.sp)
+                            },
+                            trailingIcon = {
+                                Text(
+                                    text = "ساعة",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = DarkSurfaceElevated,
+                                unfocusedContainerColor = DarkSurfaceElevated,
+                                focusedBorderColor = CyberPrimary,
+                                unfocusedBorderColor = BorderSubtle,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp)
+                                .testTag("playtime_hours_input")
+                        )
+
+                        Button(
+                            onClick = {
+                                val parsed = playtimeInput.toFloatOrNull()
+                                if (parsed == null || parsed < 0f) {
+                                    Toast.makeText(context, "يرجى كتابة عدد ساعات صحيح", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    if (!isSignedIn) {
+                                        onRequireAuth()
+                                    } else {
+                                        onLogPlaytime(game.id, parsed)
+                                        isPlaytimeSavedRecently = true
+                                        val display = if (parsed % 1f == 0f) parsed.toInt().toString() else parsed.toString()
+                                        Toast.makeText(context, "تم حفظ ومزامنة $display ساعة بنجاح! ⏱️", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = CyberPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .height(52.dp)
+                                .testTag("save_playtime_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "حفظ الساعات",
+                                tint = Color.Black,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "حفظ",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Stepper chips: +1h, +5h, +10h, +25h
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "إضافة سريعة:",
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+
+                        listOf(1, 5, 10, 25).forEach { addHours ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = DarkSurfaceElevated,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                                modifier = Modifier
+                                    .clickable {
+                                        val cur = playtimeInput.toFloatOrNull() ?: 0f
+                                        val updated = cur + addHours
+                                        playtimeInput = if (updated % 1f == 0f) updated.toInt().toString() else updated.toString()
+                                        isPlaytimeSavedRecently = false
+                                    }
+                            ) {
+                                Text(
+                                    text = "+$addHours h",
+                                    color = CyberPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        if (playtimeInput.isNotBlank() && (playtimeInput.toFloatOrNull() ?: 0f) > 0f) {
+                            Text(
+                                text = "تصفير",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                modifier = Modifier
+                                    .clickable {
+                                        playtimeInput = "0"
+                                        isPlaytimeSavedRecently = false
+                                    }
+                                    .padding(4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             // 4. Discussion Card: "التعليقات والأسئلة"
             Card(
                 shape = RoundedCornerShape(14.dp),
@@ -453,11 +674,12 @@ fun GameDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp)
-                    .offset(y = (-20).dp)
+                    .offset(y = (-14).dp)
                     .clickable {
                         Toast.makeText(context, "فتح نقاشات مجتمع ${game.title}", Toast.LENGTH_SHORT).show()
                     }
             ) {
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -671,15 +893,12 @@ fun GameDetailScreen(
                                         .height(130.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
-                                        .background(DarkSurfaceElevated)
                                 ) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(sGame.coverUrl)
-                                            .crossfade(true)
-                                            .build(),
+                                    CyberPosterImage(
+                                        imageUrl = sGame.coverUrl,
                                         contentDescription = sGame.title,
-                                        contentScale = ContentScale.Crop,
+                                        fallbackText = sGame.title,
+                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -717,12 +936,11 @@ fun GameDetailScreen(
                                     .width(220.dp)
                                     .height(130.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
                             ) {
-                                AsyncImage(
-                                    model = url,
+                                CyberPosterImage(
+                                    imageUrl = url,
                                     contentDescription = null,
-                                    contentScale = ContentScale.Crop,
+                                    shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }

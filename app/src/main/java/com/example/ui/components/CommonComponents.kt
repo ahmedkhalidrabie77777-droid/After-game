@@ -1,6 +1,12 @@
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarHalf
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -30,12 +38,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,10 +55,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.example.data.model.GameItem
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
+import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.GoldStar
@@ -223,6 +239,141 @@ fun PlatformTag(
     }
 }
 
+@Composable
+fun rememberShimmerBrush(): Brush {
+    val shimmerColors = listOf(
+        Color(0xFF0C101A),
+        Color(0xFF161F30),
+        Color(0xFF26354D),
+        Color(0xFF161F30),
+        Color(0xFF0C101A)
+    )
+    val transition = rememberInfiniteTransition(label = "shimmerTransition")
+    val translateAnim by transition.animateFloat(
+        initialValue = -500f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerTranslate"
+    )
+
+    return Brush.linearGradient(
+        colors = shimmerColors,
+        start = Offset(translateAnim, translateAnim),
+        end = Offset(translateAnim + 350f, translateAnim + 350f)
+    )
+}
+
+@Composable
+fun PosterShimmerPlaceholder(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(12.dp)
+) {
+    val brush = rememberShimmerBrush()
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(brush)
+    )
+}
+
+@Composable
+fun CyberPosterImage(
+    imageUrl: String,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    shape: Shape = RoundedCornerShape(12.dp),
+    fallbackText: String? = null
+) {
+    val context = LocalContext.current
+    val optimizedUrl = remember(imageUrl) {
+        com.example.data.remote.GameSearchHelper.optimizePosterUrl(imageUrl)
+    }
+
+    if (optimizedUrl.isNotBlank()) {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(optimizedUrl)
+                .crossfade(300)
+                .build(),
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier.clip(shape),
+            loading = {
+                PosterShimmerPlaceholder(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = shape
+                )
+            },
+            error = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(DarkSurfaceVariant, DarkSurface)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!fallbackText.isNullOrBlank()) {
+                        Text(
+                            text = fallbackText,
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(6.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.SportsEsports,
+                            contentDescription = null,
+                            tint = CyberPrimary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            },
+            success = {
+                SubcomposeAsyncImageContent()
+            }
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .clip(shape)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(DarkSurfaceVariant, DarkSurface)
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!fallbackText.isNullOrBlank()) {
+                Text(
+                    text = fallbackText,
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(6.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.SportsEsports,
+                    contentDescription = null,
+                    tint = CyberPrimary.copy(alpha = 0.5f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun GamePosterThumbnail(
@@ -233,7 +384,6 @@ fun GamePosterThumbnail(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null
 ) {
-    val gradientColors = parseGradient(game.gradientColors)
     val clickModifier = if (onClick != null || onLongClick != null) {
         Modifier.combinedClickable(
             onClick = { onClick?.invoke() },
@@ -249,47 +399,15 @@ fun GamePosterThumbnail(
             .height(height)
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
-            .background(Brush.verticalGradient(gradientColors))
             .then(clickModifier)
     ) {
-        if (game.coverUrl.isNotBlank()) {
-            AsyncImage(
-                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(game.coverUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = game.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
-            )
-        }
-
-        // Title initial watermark only if no cover image is available
-        if (game.coverUrl.isBlank()) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = game.title,
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = game.releaseYear.toString(),
-                    color = TextSecondary,
-                    fontSize = 10.sp
-                )
-            }
-        }
-
+        CyberPosterImage(
+            imageUrl = game.coverUrl,
+            contentDescription = game.title,
+            fallbackText = "${game.title}\n(${game.releaseYear})",
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.matchParentSize()
+        )
         // Rating pill in top right corner if rated
         if (game.userRating > 0f) {
             Surface(

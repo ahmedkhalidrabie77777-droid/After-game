@@ -86,6 +86,7 @@ import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
+import com.example.ui.util.AppLanguage
 import com.example.ui.viewmodel.GameViewModel
 import com.example.ui.viewmodel.NavigationTab
 import com.google.firebase.Firebase
@@ -212,8 +213,9 @@ fun AuthRequiredDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    val isArabic = AppLanguage.isArabic
                     Text(
-                        text = "تسجيل الدخول مطلوب",
+                        text = if (isArabic) "تسجيل الدخول مطلوب" else "Sign In Required",
                         color = TextPrimary,
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Bold
@@ -222,7 +224,11 @@ fun AuthRequiredDialog(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "لإكمال هذا التفاعل، سجل دخولك أولاً لمشاركة تقييمك، تعليقك، أو مراجعتك مع مجتمع After Game.",
+                        text = if (isArabic) {
+                            "لإكمال هذا التفاعل، سجّل دخولك بحساب Google لمشاركة تقييمك الحقيقي مع مجتمع اللاعبين."
+                        } else {
+                            "To complete this action, please sign in with your Google account to share your verified review."
+                        },
                         color = TextMuted,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
@@ -241,7 +247,7 @@ fun AuthRequiredDialog(
                             .testTag("btn_dialog_signin")
                     ) {
                         Text(
-                            text = "تسجيل الدخول عبر Google",
+                            text = if (isArabic) "تسجيل الدخول بحساب Google" else "Sign in with Google",
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
@@ -254,7 +260,7 @@ fun AuthRequiredDialog(
                         onClick = onDismiss
                     ) {
                         Text(
-                            text = "لاحقًا",
+                            text = if (isArabic) "لاحقاً" else "Later",
                             color = CyberSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -290,6 +296,7 @@ fun AfterGameApp(
     val upcomingGames by viewModel.upcomingGames.collectAsStateWithLifecycle()
     val topRatedGames by viewModel.topRatedGames.collectAsStateWithLifecycle()
     val isLoadingApi by viewModel.isLoadingApi.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
 
     val compareGameA by viewModel.compareGameA.collectAsStateWithLifecycle()
     val compareGameB by viewModel.compareGameB.collectAsStateWithLifecycle()
@@ -303,6 +310,7 @@ fun AfterGameApp(
     val context = LocalContext.current
 
     val isSignedIn = currentUser != null
+    val isArabic = AppLanguage.isArabic
 
     BackHandler(
         enabled = radialMenuGame != null || selectedReviewForComments != null || selectedDetailGame != null ||
@@ -341,13 +349,13 @@ fun AfterGameApp(
                     icon = {
                         Icon(
                             imageVector = if (isHome) Icons.Filled.Home else Icons.Outlined.Home,
-                            contentDescription = "Home",
+                            contentDescription = if (isArabic) "الرئيسية" else "Home",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "Home",
+                            text = if (isArabic) "الرئيسية" else "Home",
                             fontSize = 11.sp,
                             fontWeight = if (isHome) FontWeight.Bold else FontWeight.Normal
                         )
@@ -370,13 +378,13 @@ fun AfterGameApp(
                     icon = {
                         Icon(
                             imageVector = if (isDiscover) Icons.Filled.Explore else Icons.Outlined.Explore,
-                            contentDescription = "Discover",
+                            contentDescription = if (isArabic) "استكشاف" else "Discover",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "Discover",
+                            text = if (isArabic) "استكشاف" else "Discover",
                             fontSize = 11.sp,
                             fontWeight = if (isDiscover) FontWeight.Bold else FontWeight.Normal
                         )
@@ -399,13 +407,13 @@ fun AfterGameApp(
                     icon = {
                         Icon(
                             imageVector = if (isCompare) Icons.Filled.CompareArrows else Icons.Outlined.CompareArrows,
-                            contentDescription = "Compare",
+                            contentDescription = if (isArabic) "مقارنة" else "Compare",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "Compare",
+                            text = if (isArabic) "مقارنة" else "Compare",
                             fontSize = 11.sp,
                             fontWeight = if (isCompare) FontWeight.Bold else FontWeight.Normal
                         )
@@ -428,13 +436,13 @@ fun AfterGameApp(
                     icon = {
                         Icon(
                             imageVector = if (isLists) Icons.Filled.Bookmarks else Icons.Outlined.Bookmarks,
-                            contentDescription = "Lists",
+                            contentDescription = if (isArabic) "القوائم" else "Lists",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "Lists",
+                            text = if (isArabic) "القوائم" else "Lists",
                             fontSize = 11.sp,
                             fontWeight = if (isLists) FontWeight.Bold else FontWeight.Normal
                         )
@@ -457,13 +465,13 @@ fun AfterGameApp(
                     icon = {
                         Icon(
                             imageVector = if (isProfile) Icons.Filled.Person else Icons.Outlined.Person,
-                            contentDescription = "Profile",
+                            contentDescription = if (isArabic) "حسابي" else "Profile",
                             modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "Profile",
+                            text = if (isArabic) "حسابي" else "Profile",
                             fontSize = 11.sp,
                             fontWeight = if (isProfile) FontWeight.Bold else FontWeight.Normal
                         )
@@ -504,6 +512,7 @@ fun AfterGameApp(
                             },
                             onRequireAuth = onRequireAuth,
                             onOpenListsTab = { viewModel.setActiveTab(NavigationTab.LISTS) },
+                            onNavigateToExplore = { viewModel.setActiveTab(NavigationTab.DISCOVER) },
                             onPosterLongClick = { radialMenuGame = it },
                             popularGames = popularGames,
                             newReleases = newReleases,
@@ -528,7 +537,9 @@ fun AfterGameApp(
                                 if (isSignedIn) viewModel.setAddGameDialogOpen(true) else onRequireAuth()
                             },
                             onPosterLongClick = { radialMenuGame = it },
-                            isSearchingRawg = isSearchingRawg || isLoadingApi
+                            isSearchingRawg = isSearchingRawg || isLoadingApi,
+                            onLoadMore = { viewModel.loadMoreExploreGames() },
+                            isLoadingMore = isLoadingMore
                         )
                     }
 
@@ -600,7 +611,16 @@ fun AfterGameApp(
                 onToggleFavorite = {
                     if (isSignedIn) viewModel.toggleFavorite(game) else onRequireAuth()
                 },
-                onPosterLongClick = { radialMenuGame = it }
+                onPosterLongClick = { radialMenuGame = it },
+                isSignedIn = isSignedIn,
+                onRequireAuth = onRequireAuth,
+                onLogPlaytime = { gameId, hours ->
+                    if (isSignedIn) {
+                        viewModel.logPlaytime(gameId, hours)
+                    } else {
+                        onRequireAuth()
+                    }
+                }
             )
         }
     }

@@ -58,6 +58,7 @@ import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
+import com.example.ui.util.AppLanguage
 import com.example.ui.theme.TextSecondary
 
 data class CuratedListInfo(
@@ -142,8 +143,9 @@ fun ListsScreen(
                 )
             }
 
+            val isArabic = AppLanguage.isArabic
             Text(
-                text = "Lists",
+                text = if (isArabic) "القوائم" else "Lists",
                 color = TextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -151,10 +153,17 @@ fun ListsScreen(
         }
 
         // Search public lists field
+        val isArabic = AppLanguage.isArabic
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search public lists...", color = TextMuted, fontSize = 13.sp) },
+            placeholder = {
+                Text(
+                    text = if (isArabic) "بحث في القوائم العامة..." else "Search public lists...",
+                    color = TextMuted,
+                    fontSize = 13.sp
+                )
+            },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -179,14 +188,19 @@ fun ListsScreen(
         )
 
         // Sub-tabs row: [Lists] [Friends] [Trending] [Top Rated]
+        val tabsList = if (isArabic) {
+            listOf("القوائم", "الأصدقاء", "الشائع", "الأعلى تقييماً")
+        } else {
+            listOf("Lists", "Friends", "Trending", "Top Rated")
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            listOf("Lists", "Friends", "Trending", "Top Rated").forEach { tab ->
-                val isSelected = activeSubTab == tab
+            tabsList.forEach { tab ->
+                val isSelected = activeSubTab == tab || (activeSubTab == "Lists" && tab == "القوائم")
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier

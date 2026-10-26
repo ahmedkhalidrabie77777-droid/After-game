@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.model.GameItem
+import com.example.ui.components.CyberPosterImage
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
@@ -70,6 +71,7 @@ import com.example.ui.theme.GoldStar
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.util.AppLanguage
 
 @Composable
 fun CompareScreen(
@@ -97,9 +99,11 @@ fun CompareScreen(
     ) {
         Spacer(modifier = Modifier.height(14.dp))
 
+        val isArabic = AppLanguage.isArabic
+
         // Title and Subtitle as in Video 00:28
         Text(
-            text = "Everyday Viewer Game Comparison",
+            text = if (isArabic) "مقارنة الألعاب وجهاً لوجه" else "Everyday Gamer Comparison",
             color = TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.ExtraBold
@@ -108,7 +112,11 @@ fun CompareScreen(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "Head-to-head comparison to see which game real audiences loved more",
+            text = if (isArabic) {
+                "مقارنة مباشرة بين لعبتين لمعرفة أيهما نالت إعجاب ورضا اللاعبين أكثر"
+            } else {
+                "Head-to-head comparison to see which game real audiences loved more"
+            },
             color = TextMuted,
             fontSize = 12.sp,
             lineHeight = 16.sp
@@ -116,7 +124,7 @@ fun CompareScreen(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // Side-by-side Game Cards (Film A vs Film B)
+        // Side-by-side Game Cards
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -124,7 +132,7 @@ fun CompareScreen(
             // Game A
             Box(modifier = Modifier.weight(1f)) {
                 GameCompareCard(
-                    slotLabel = "Game A",
+                    slotLabel = if (isArabic) "اللعبة الأولى" else "Game A",
                     game = effectiveGameA,
                     onCardClick = { selectingForSlot = "A" }
                 )
@@ -133,7 +141,7 @@ fun CompareScreen(
             // Game B
             Box(modifier = Modifier.weight(1f)) {
                 GameCompareCard(
-                    slotLabel = "Game B",
+                    slotLabel = if (isArabic) "اللعبة الثانية" else "Game B",
                     game = effectiveGameB,
                     onCardClick = { selectingForSlot = "B" }
                 )
@@ -144,7 +152,7 @@ fun CompareScreen(
 
         // Direct Comparison Matrix Header
         Text(
-            text = "Direct Comparison Matrix",
+            text = if (isArabic) "مصفوفة المقارنة المباشرة" else "Direct Comparison Matrix",
             color = TextPrimary,
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold
@@ -156,7 +164,7 @@ fun CompareScreen(
         val scoreA1 = ((effectiveGameA?.communityRating ?: 4.5f) * 19.5f).coerceIn(10f, 98f)
         val scoreB1 = ((effectiveGameB?.communityRating ?: 4.0f) * 17.5f).coerceIn(10f, 98f)
         MatrixRowMetric(
-            title = "Immortal Viewer Score",
+            title = if (isArabic) "درجة تقييم اللاعبين" else "Gamer Score",
             valueA = "%.0f%%".format(scoreA1),
             valueB = "%.0f%%".format(scoreB1),
             progressA = scoreA1 / 100f,
@@ -171,7 +179,7 @@ fun CompareScreen(
         val scoreA2 = ((effectiveGameA?.communityRating ?: 4.7f) * 2f).coerceIn(1f, 10f)
         val scoreB2 = ((effectiveGameB?.communityRating ?: 3.8f) * 1.8f).coerceIn(1f, 10f)
         MatrixRowMetric(
-            title = "Viewer Immersion & Satisfaction",
+            title = if (isArabic) "الانغماس والرضا العام" else "Immersion & Satisfaction",
             valueA = "%.1f/10".format(scoreA2),
             valueB = "%.1f/10".format(scoreB2),
             progressA = scoreA2 / 10f,
@@ -182,11 +190,11 @@ fun CompareScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Metric 3: Acting & Character Impact
+        // Metric 3: Gameplay & Character Impact
         val scoreA3 = 9.7f
         val scoreB3 = 3.5f
         MatrixRowMetric(
-            title = "Gameplay & Character Impact",
+            title = if (isArabic) "أسلوب اللعب والقصة" else "Gameplay & Story Impact",
             valueA = "%.1f/10".format(scoreA3),
             valueB = "%.1f/10".format(scoreB3),
             progressA = scoreA3 / 10f,
@@ -199,7 +207,7 @@ fun CompareScreen(
 
         // Metric 4: Recommendation Rate
         MatrixRowMetric(
-            title = "Recommendation Rate",
+            title = if (isArabic) "نسبة التوصية باللعبة" else "Recommendation Rate",
             valueA = "94%",
             valueB = "19%",
             progressA = 0.94f,
@@ -212,7 +220,7 @@ fun CompareScreen(
 
         // Metric 5: Everyday Viewer Pulse
         MatrixRowMetric(
-            title = "Everyday Gamer Pulse",
+            title = if (isArabic) "نبض المجتمع" else "Community Pulse",
             valueA = "91%",
             valueB = "48%",
             progressA = 0.91f,
@@ -257,13 +265,11 @@ fun CompareScreen(
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            AsyncImage(
-                                model = game.coverUrl,
+                            CyberPosterImage(
+                                imageUrl = game.coverUrl,
                                 contentDescription = game.title,
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Crop
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.size(42.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
@@ -329,21 +335,13 @@ private fun GameCompareCard(
                     .clip(RoundedCornerShape(12.dp))
                     .background(DarkSurfaceVariant)
             ) {
-                if (game?.coverUrl?.isNotBlank() == true) {
-                    AsyncImage(
-                        model = game.coverUrl,
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.img_hero_banner),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                CyberPosterImage(
+                    imageUrl = game?.coverUrl ?: "",
+                    contentDescription = game?.title,
+                    fallbackText = game?.title ?: "Select Game",
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
             Spacer(modifier = Modifier.height(10.dp))

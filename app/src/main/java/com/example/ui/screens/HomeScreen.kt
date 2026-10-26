@@ -66,6 +66,7 @@ import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.firebase.FirebaseReview
 import com.example.data.model.GameItem
+import com.example.ui.components.CyberPosterImage
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.CyberPrimary
 import com.example.ui.theme.CyberSecondary
@@ -78,6 +79,7 @@ import com.example.ui.theme.GoldStar
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.util.AppLanguage
 import com.google.firebase.auth.FirebaseUser
 
 enum class HomeSection {
@@ -103,6 +105,7 @@ fun HomeScreen(
     onOpenComments: (FirebaseReview) -> Unit,
     onRequireAuth: () -> Unit,
     onOpenListsTab: () -> Unit,
+    onNavigateToExplore: () -> Unit = {},
     onPosterLongClick: (GameItem) -> Unit = {},
     popularGames: List<GameItem> = emptyList(),
     newReleases: List<GameItem> = emptyList(),
@@ -161,6 +164,7 @@ fun HomeScreen(
                 modifier = Modifier.padding(2.dp)
             ) {
                 Row(modifier = Modifier.padding(3.dp)) {
+                    val isArabic = AppLanguage.isArabic
                     val isHome = activeSection == HomeSection.HOME
                     Box(
                         modifier = Modifier
@@ -171,7 +175,7 @@ fun HomeScreen(
                             .testTag("toggle_home")
                     ) {
                         Text(
-                            text = "Home",
+                            text = if (isArabic) "الرئيسية" else "Home",
                             color = if (isHome) Color.Black else TextSecondary,
                             fontWeight = if (isHome) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 13.sp
@@ -188,7 +192,7 @@ fun HomeScreen(
                             .testTag("toggle_community")
                     ) {
                         Text(
-                            text = "Community",
+                            text = if (isArabic) "المجتمع" else "Community",
                             color = if (isCommunity) Color.Black else TextSecondary,
                             fontWeight = if (isCommunity) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 13.sp
@@ -199,6 +203,7 @@ fun HomeScreen(
         }
 
         // Sub-tabs row based on active section
+        val isArabic = AppLanguage.isArabic
         if (activeSection == HomeSection.HOME) {
             Row(
                 modifier = Modifier
@@ -215,7 +220,7 @@ fun HomeScreen(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = tab.titleEn,
+                            text = if (isArabic) tab.titleAr else tab.titleEn,
                             color = if (isSelected) TextPrimary else TextMuted,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 14.sp
@@ -233,13 +238,18 @@ fun HomeScreen(
             }
         } else {
             // Community sub-tabs: [Community] [Friends] [Popular] [Following]
+            val communityTabs = if (isArabic) {
+                listOf("المجتمع", "الأصدقاء", "الشائع", "المتابَعون")
+            } else {
+                listOf("Community", "Friends", "Popular", "Following")
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                listOf("Community", "Friends", "Popular", "Following").forEach { cTab ->
+                communityTabs.forEach { cTab ->
                     val isSelected = communitySubTab == cTab
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -280,6 +290,7 @@ fun HomeScreen(
                         currentUser = currentUser,
                         onGameClick = onGameClick,
                         onRequireAuth = onRequireAuth,
+                        onNavigateToExplore = onNavigateToExplore,
                         onPosterLongClick = onPosterLongClick
                     )
                 }
@@ -328,12 +339,14 @@ private fun GamesHomeContent(
     currentUser: FirebaseUser?,
     onGameClick: (GameItem) -> Unit,
     onRequireAuth: () -> Unit,
+    onNavigateToExplore: () -> Unit = {},
     onPosterLongClick: (GameItem) -> Unit = {}
 ) {
     val displayReleases = if (newReleases.isNotEmpty()) newReleases else games.take(10)
     val displayUpcoming = if (upcomingGames.isNotEmpty()) upcomingGames else games.filter { it.releaseYear >= 2025 }.take(10)
     val displayPopular = if (popularGames.isNotEmpty()) popularGames else games
     val popularChunks = remember(displayPopular) { displayPopular.chunked(3) }
+    val isArabic = AppLanguage.isArabic
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -375,6 +388,7 @@ private fun GamesHomeContent(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
+                    val isArabic = AppLanguage.isArabic
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -384,14 +398,18 @@ private fun GamesHomeContent(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Welcome to After Game",
+                                text = if (isArabic) "مرحباً بك في After Game" else "Welcome to After Game",
                                 color = TextPrimary,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = "Explore games from RAWG, Steam, IGDB. Sign in to save lists & rate.",
+                                text = if (isArabic) {
+                                    "استكشف آلاف الألعاب من RAWG و Steam. سجّل دخولك لحفظ قوائمك وتقييم تجاربك."
+                                } else {
+                                    "Explore games from RAWG, Steam, IGDB. Sign in to save lists & rate."
+                                },
                                 color = TextMuted,
                                 fontSize = 11.sp,
                                 lineHeight = 16.sp
@@ -407,7 +425,7 @@ private fun GamesHomeContent(
                             modifier = Modifier.testTag("btn_welcome_signup")
                         ) {
                             Text(
-                                text = "Sign In",
+                                text = if (isArabic) "تسجيل الدخول" else "Sign In",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
@@ -428,16 +446,17 @@ private fun GamesHomeContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "New Releases",
+                    text = if (isArabic) "أحدث الإصدارات" else "New Releases",
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "View All >",
-                    color = TextMuted,
+                    text = if (isArabic) "عرض الكل >" else "View All >",
+                    color = CyberPrimary,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { onNavigateToExplore() }
                 )
             }
 
@@ -468,16 +487,17 @@ private fun GamesHomeContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Upcoming Games",
+                    text = if (isArabic) "ألعاب قادمة" else "Upcoming Games",
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "View All >",
-                    color = TextMuted,
+                    text = if (isArabic) "عرض الكل >" else "View All >",
+                    color = CyberPrimary,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { onNavigateToExplore() }
                 )
             }
 
@@ -491,7 +511,7 @@ private fun GamesHomeContent(
                         onClick = { onGameClick(game) },
                         onLongClick = { onPosterLongClick(game) },
                         onRequireAuth = onRequireAuth,
-                        badgeText = "Soon"
+                        badgeText = if (isArabic) "قريباً" else "Soon"
                     )
                 }
             }
@@ -506,14 +526,14 @@ private fun GamesHomeContent(
                     .padding(horizontal = 18.dp, vertical = 6.dp)
             ) {
                 Text(
-                    text = "Popular Games",
+                    text = if (isArabic) "الألعاب الأكثر شهرة" else "Popular Games",
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Explore curated titles with complete verified ratings",
+                    text = if (isArabic) "استكشف ألعاباً منتقاة بعناية مع تقييمات موثوقة" else "Explore curated titles with complete verified ratings",
                     color = TextMuted,
                     fontSize = 12.sp
                 )
@@ -569,45 +589,14 @@ private fun GamePosterGridCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(gradientColors))
         ) {
-            if (game.coverUrl.isNotBlank()) {
-                AsyncImage(
-                    model = coil.request.ImageRequest.Builder(context)
-                        .data(game.coverUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = game.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.SportsEsports,
-                            contentDescription = null,
-                            tint = CyberPrimary.copy(alpha = 0.8f),
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = game.title,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
+            CyberPosterImage(
+                imageUrl = game.coverUrl,
+                contentDescription = game.title,
+                fallbackText = game.title,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxSize()
+            )
 
             // Dark gradient overlay for bottom text legibility
             Box(
@@ -703,19 +692,14 @@ private fun GameReleaseCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .background(Brush.verticalGradient(gradientColors))
             ) {
-                if (game.coverUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = coil.request.ImageRequest.Builder(context)
-                            .data(game.coverUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                CyberPosterImage(
+                    imageUrl = game.coverUrl,
+                    contentDescription = game.title,
+                    fallbackText = game.title,
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                    modifier = Modifier.fillMaxSize()
+                )
 
                 // Year / Soon Badge top-left
                 Surface(
@@ -810,6 +794,7 @@ private fun ReviewsHomeContent(
     games: List<GameItem>,
     onReviewClick: (GameItem) -> Unit
 ) {
+    val isArabic = AppLanguage.isArabic
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -822,7 +807,7 @@ private fun ReviewsHomeContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Honest Viewer Reviews",
+                    text = if (isArabic) "مراجعات اللاعبين الحقيقية" else "Honest Gamer Reviews",
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -846,10 +831,56 @@ private fun ReviewsHomeContent(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Write Review",
+                        text = if (isArabic) "اكتب مراجعة" else "Write Review",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+            }
+        }
+
+        if (reviews.isEmpty()) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SportsEsports,
+                            contentDescription = null,
+                            tint = CyberPrimary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = if (isArabic) "لا توجد مراجعات حتى الآن" else "No community reviews yet",
+                            color = TextPrimary,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (isArabic) {
+                                "جميع التقييمات في After Game حقيقية 100% ومن المستخدمين الفعليين. سجّل دخولك بحساب Google وكن أول من يقيّم وينشر مراجعته!"
+                            } else {
+                                "All ratings on After Game are 100% genuine from real players. Sign in and be the first to post a review!"
+                            },
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -1143,79 +1174,78 @@ private fun CommunityHomeContent(
     onOpenComments: (FirebaseReview) -> Unit,
     onRequireAuth: () -> Unit
 ) {
+    val isArabic = AppLanguage.isArabic
+    val realGamers = remember(reviews) {
+        reviews.mapNotNull { it.authorName.ifBlank { null } }.distinct()
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // Section: "People you may know" (as in video 00:16)
-        item {
-            Text(
-                text = "People you may know",
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-            )
+        if (realGamers.isNotEmpty()) {
+            item {
+                Text(
+                    text = if (isArabic) "لاعبون في المجتمع" else "Community Gamers",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                )
 
-            val suggestedGamers = listOf(
-                "Omar_Cinema",
-                "Sara_FilmBuff",
-                "Karim_Realist",
-                "Ahmed_ProGamer"
-            )
-
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                items(suggestedGamers) { gamerName ->
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                        modifier = Modifier.width(120.dp)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp)
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    items(realGamers) { gamerName ->
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                            modifier = Modifier.width(120.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(CircleShape)
-                                    .background(CyberPrimary.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp)
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .clip(CircleShape)
+                                        .background(CyberPrimary.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = gamerName.take(1).uppercase(),
+                                        color = CyberPrimary,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = gamerName.take(1),
-                                    color = CyberPrimary,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = gamerName,
+                                    color = TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = gamerName,
-                                color = TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = onRequireAuth,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                                shape = RoundedCornerShape(20.dp),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                                modifier = Modifier.height(28.dp)
-                            ) {
-                                Text(
-                                    text = "Follow",
-                                    color = Color.Black,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = onRequireAuth,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                    shape = RoundedCornerShape(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = if (isArabic) "متابعة" else "Follow",
+                                        color = Color.Black,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
